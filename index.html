@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Photorealistic Real-Time Mountain Stream — WebGL2 / Three.js Simulation</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #0b0e11;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #e6edf3;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+      }
+      #loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at center, #141c24 0%, #090c10 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.6s ease-out;
+        pointer-events: none;
+      }
+      #loading-overlay.hidden {
+        opacity: 0;
+      }
+      .loader-title {
+        font-size: 1.15rem;
+        font-weight: 500;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #d2e3f3;
+        margin-bottom: 12px;
+      }
+      .loader-subtitle {
+        font-size: 0.82rem;
+        color: #7d92a8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      .loader-bar-wrap {
+        width: 240px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        margin-top: 18px;
+        overflow: hidden;
+      }
+      .loader-bar {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+        transform-origin: left;
+        animation: pulseLoad 1.2s ease-in-out infinite;
+      }
+      @keyframes pulseLoad {
+        0% { transform: scaleX(0.15); opacity: 0.6; }
+        50% { transform: scaleX(0.85); opacity: 1; }
+        100% { transform: scaleX(1.0); opacity: 0.4; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="loading-overlay">
+      <div class="loader-title">Initializing GPU Water Simulation</div>
+      <div class="loader-subtitle" id="loader-status">Compiling GLSL Shaders &amp; Generating Riverbed...</div>
+      <div class="loader-bar-wrap"><div class="loader-bar"></div></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
