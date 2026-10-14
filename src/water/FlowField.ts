@@ -121,12 +121,20 @@ export class FlowField {
     this.initRockDescriptors();
     this.bakeFields();
 
+    const len = resolution * resolution * 4;
+    const flowHalf = new Uint16Array(len);
+    const terrainHalf = new Uint16Array(len);
+    for (let i = 0; i < len; i++) {
+      flowHalf[i] = THREE.DataUtils.toHalfFloat(this.flowData[i]);
+      terrainHalf[i] = THREE.DataUtils.toHalfFloat(this.terrainData[i]);
+    }
+
     this.flowTexture = new THREE.DataTexture(
-      this.flowData as unknown as BufferSource,
+      flowHalf as unknown as BufferSource,
       resolution,
       resolution,
       THREE.RGBAFormat,
-      THREE.FloatType
+      THREE.HalfFloatType
     );
     this.flowTexture.wrapS = THREE.ClampToEdgeWrapping;
     this.flowTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -135,11 +143,11 @@ export class FlowField {
     this.flowTexture.needsUpdate = true;
 
     this.terrainTexture = new THREE.DataTexture(
-      this.terrainData as unknown as BufferSource,
+      terrainHalf as unknown as BufferSource,
       resolution,
       resolution,
       THREE.RGBAFormat,
-      THREE.FloatType
+      THREE.HalfFloatType
     );
     this.terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
     this.terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
