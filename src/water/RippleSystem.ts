@@ -153,16 +153,26 @@ export class RippleSystem {
   }
 
   public update(renderer: THREE.WebGLRenderer, currentTime: number, dt: number): void {
-    // Filter out expired drops so shaders only iterate over active ripples (0 when idle!)
-    this.drops = this.drops.filter((d) => currentTime - d.startTime < 4.0);
-    this.activeDropCount = this.drops.length;
+    // Compact expired drops in-place without allocating a new Array every frame
+    let writeIdx = 0;
+    for (let i = 0; i < this.drops.length; i++) {
+      const d = this.drops[i];
+      if (currentTime - d.startTime < 4.0) {
+        this.drops[writeIdx++] = d;
+      }
+    }
+    const prevActiveCount = this.activeDropCount;
+    this.drops.length = writeIdx;
+    this.activeDropCount = writeIdx;
 
-    for (let i = 0; i < this.maxDrops; i++) {
-      if (i < this.activeDropCount) {
-        const d = this.drops[i];
-        this.dropUniformArray[i].set(d.x, d.z, d.startTime, d.strength);
-      } else {
-        this.dropUniformArray[i].set(0, 0, -100, 0);
+    if (this.activeDropCount > 0 || prevActiveCount > 0) {
+      for (let i = 0; i < this.maxDrops; i++) {
+        if (i < this.activeDropCount) {
+          const d = this.drops[i];
+          this.dropUniformArray[i].set(d.x, d.z, d.startTime, d.strength);
+        } else {
+          this.dropUniformArray[i].set(0, 0, -100, 0);
+        }
       }
     }
 

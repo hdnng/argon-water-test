@@ -1,4 +1,5 @@
 import { FeatureToggles, QualityPresetName } from '../utils/QualityPresets';
+import { BenchmarkScenarioName } from './PerformanceMonitor';
 
 export type CameraPresetName = 'cinematic' | 'closeup' | 'cascade' | 'overhead';
 
@@ -8,7 +9,7 @@ export interface DebugPanelCallbacks {
   onCameraPreset: (cameraPreset: CameraPresetName) => void;
   onHudToggle: (visible: boolean) => void;
   onPauseToggle: (paused: boolean) => void;
-  onRunBenchmark: () => void;
+  onRunBenchmark: (scenario: BenchmarkScenarioName) => void;
 }
 
 export class DebugPanel {
@@ -16,6 +17,7 @@ export class DebugPanel {
   private readonly callbacks: DebugPanelCallbacks;
   private checkboxMap: Partial<Record<keyof FeatureToggles, HTMLInputElement>> = {};
   private presetButtons: Partial<Record<QualityPresetName, HTMLButtonElement>> = {};
+  private benchScenarioSelect!: HTMLSelectElement;
   private benchBtn!: HTMLButtonElement;
   private collapsed = false;
 
@@ -79,9 +81,15 @@ export class DebugPanel {
           <div id="dbg-toggles" style="display:flex; flex-direction:column; gap:4px;"></div>
         </div>
 
-        <div style="margin-bottom:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08);">
+        <div style="margin-bottom:8px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:5px;">
+          <select id="dbg-bench-scenario" style="width:100%; background:#141e28; color:#c9d8e6; border:1px solid rgba(255,255,255,0.16); border-radius:5px; padding:4px 6px; font-size:11px; cursor:pointer;">
+            <option value="overview">A. Stream Overview</option>
+            <option value="waterfall">B. Close-Up Waterfall</option>
+            <option value="boulders">C. Close-Up Boulders</option>
+            <option value="orbit">D. Camera Movement &amp; Orbit</option>
+          </select>
           <button id="dbg-bench-btn" class="preset-btn" style="width:100%; padding:5px 8px; font-weight:600; color:#7cc4fa; border-color:rgba(124,196,250,0.35);">
-            Run Fixed 5s Benchmark
+            Run Reproducible Benchmark
           </button>
         </div>
 
@@ -193,9 +201,11 @@ export class DebugPanel {
       togglesWrap.appendChild(row);
     }
 
+    this.benchScenarioSelect = this.container.querySelector('#dbg-bench-scenario') as HTMLSelectElement;
     this.benchBtn = this.container.querySelector('#dbg-bench-btn') as HTMLButtonElement;
     this.benchBtn.addEventListener('click', () => {
-      this.callbacks.onRunBenchmark();
+      const scenario = (this.benchScenarioSelect.value as BenchmarkScenarioName) || 'overview';
+      this.callbacks.onRunBenchmark(scenario);
     });
 
     const hudChk = this.container.querySelector('#dbg-hud-chk') as HTMLInputElement;
@@ -211,7 +221,8 @@ export class DebugPanel {
 
   public setBenchmarkRunning(running: boolean): void {
     this.benchBtn.disabled = running;
-    this.benchBtn.textContent = running ? 'Benchmark Running...' : 'Run Fixed 5s Benchmark';
+    this.benchScenarioSelect.disabled = running;
+    this.benchBtn.textContent = running ? 'Benchmark Running...' : 'Run Reproducible Benchmark';
     this.benchBtn.style.opacity = running ? '0.6' : '1.0';
   }
 

@@ -27,11 +27,8 @@ uniform float uPointerEnabled;
 varying vec3 vWorldPos;
 varying vec4 vClipPos;
 varying vec2 vDomainUV;
-varying vec4 vFlow;
-varying float vWaterBaseY;
-varying float vSolidY;
-varying vec2 vObsGrad;
-varying float vWaveHeight;
+varying vec2 vMacroSlope;
+varying vec4 vVortexRot;
 
 float perspectiveDepthToViewZ(float invClipZ, float near, float far) {
   return (near * far) / ((far - near) * invClipZ - far);
@@ -39,10 +36,14 @@ float perspectiveDepthToViewZ(float invClipZ, float near, float far) {
 
 // Fast, high-definition wave normal gradient reconstruction using precomputed analytical
 // wave slopes in 512x512 mipmapped uNoiseTex.rg (1 texture fetch per octave instead of 3!).
-vec2 evaluateBandLimitedWaveGrad(vec2 pos, vec2 flowDir, float speed, int octaves, float distAtten) {
-  vec2 perpDir = vec2(-flowDir.y, flowDir.x);
-  // Flow-aligned coordinate frame: elongated along stream velocity for coherent chevron ripples
-  float streamStretch = 0.21 / (1.0 + 0.26 * clamp(speed - 0.85, 0.0, 1.8));
+vec2 evaluateBandLimitedWaveGrad(
+  vec2 pos,
+  vec2 flowDir,
+  vec2 perpDir,
+  float streamStretch,
+  int octaves,
+  float distAtten
+) {
   vec2 aligned = vec2(dot(pos, perpDir) * 0.42, dot(pos, flowDir) * streamStretch);
 
   // Octave 1: Primary flow-aligned stream undulations & chevron wave train
@@ -76,9 +77,18 @@ vec2 evaluateBandLimitedWaveGrad(vec2 pos, vec2 flowDir, float speed, int octave
 }
 
 // Dual-phase flow-map advection with spatial phase decorrelation
-vec2 sampleAdvectedWaveNormals(vec2 worldXZ, vec2 velocity, int octaves, float distAtten) {
+vec2 sampleAdvectedWaveNormals(
+  vec2 worldXZ,
+  vec2 velocity,
+  vec2 flowDir,
+  vec2 perpDir,
+  float speed,
+  float lowFreqNoiseB,
+  int octaves,
+  float distAtten
+) {
   float cyclePeriod = 2.4;
-  float phaseOffset = texture2D(uNoiseTex, worldXZ * 0.065).b * 0.85;
+  float phaseOffset = lowFreqNoiseB * 0.85;
 
   float t = uTime / cyclePeriod + phaseOffset;
   float phase0 = fract(t);
@@ -87,14 +97,13 @@ vec2 sampleAdvectedWaveNormals(vec2 worldXZ, vec2 velocity, int octaves, float d
   vec2 advPos0 = worldXZ - velocity * (phase0 * cyclePeriod * 0.84);
   vec2 advPos1 = worldXZ - velocity * (phase1 * cyclePeriod * 0.84) + vec2(4.37, 2.91);
 
-  float speed = length(velocity);
-  vec2 flowDir = speed > 0.001 ? velocity / speed : vec2(0.0, 1.0);
+  float streamStretch = 0.21 / (1.0 + 0.26 * clamp(speed - 0.85, 0.0, 1.8));
 
-  vec2 grad0 = evaluateBandLimitedWaveGrad(advPos0, flowDir, speed, octaves, distAtten);
-  vec2 grad1 = evaluateBandLimitedWaveGrad(advPos1, flowDir, speed, octaves, distAtten);
+  vec2 grad0 = evaluateBandLimitedWaveGrad(advPos0, flowDir, perpDir, streamStretch, octaves, distAtten);
+  vec2 grad1 = evaluateBandLimitedWaveGrad(advPos1, flowDir, perpDir, streamStretch, octaves, distAtten);
 
   float weight0 = 0.5 - 0.5 * cos(phase0 * 6.2831853);
-  float weight1 = 0.5 - 0.5 * cos(phase1 * 6.2831853);
+  float weight1 = 1.0 - weight0;
   float normFactor = inversesqrt(max(0.0001, weight0 * weight0 + weight1 * weight1));
 
   return (grad0 * weight0 + grad1 * weight1) * normFactor;
@@ -148,22 +157,30 @@ void main() {
   // Distance-aware normal filtering
   float distAtten = 1.0 / (1.0 + camDist * 0.12);
 
-  // 1. Base macro slope normal (from baked terrain water surface elevation)
-  float eps = 0.085;
-  float hR = texture2D(uTerrainMap, clamp(vDomainUV + vec2(eps / 16.0, 0.0), 0.0, 1.0)).g;
-  float hL = texture2D(uTerrainMap, clamp(vDomainUV - vec2(eps / 16.0, 0.0), 0.0, 1.0)).g;
-  float hU = texture2D(uTerrainMap, clamp(vDomainUV + vec2(0.0, eps / 24.0), 0.0, 1.0)).g;
-  float hD = texture2D(uTerrainMap, clamp(vDomainUV - vec2(0.0, eps / 24.0), 0.0, 1.0)).g;
-  vec2 macroSlope = vec2((hR - hL) / (2.0 * eps), (hU - hD) / (2.0 * eps));
+  // 1. Base macro slope normal (interpolated from vertex shader to save 4 terrain texture fetches per pixel)
+  vec2 macroSlope = vMacroSlope;
+
+  vec2 flowDir = speed > 0.001 ? velocity / speed : vec2(0.0, 1.0);
+  vec2 perpDir = vec2(-flowDir.y, flowDir.x);
+
+  // Shared low-frequency spatial phase decorrelation sample (reused by both wave advection and foam advection)
+  float lowFreqNoiseB = texture2D(uNoiseTex, vWorldPos.xz * 0.065).b;
 
   // 2. Coherent velocity- and turbulence-scaled wave normals (calm in slow pools, energetic in central current)
   float speedMod = 0.092 + 0.130 * smoothstep(0.18, 1.50, speed) + 0.085 * clamp(turbulence, 0.0, 1.15);
-  vec2 waveGrad = sampleAdvectedWaveNormals(vWorldPos.xz, velocity, uWaveOctaves, distAtten) * speedMod;
+  vec2 waveGrad = sampleAdvectedWaveNormals(
+    vWorldPos.xz,
+    velocity,
+    flowDir,
+    perpDir,
+    speed,
+    lowFreqNoiseB,
+    uWaveOctaves,
+    distAtten
+  ) * speedMod;
 
   // 3. Velocity-dependent local flow disturbances around submerged & partially submerged rocks
   vec2 rockGrad = vec2(0.0);
-  vec2 flowDir = speed > 0.01 ? velocity / speed : vec2(0.0, 1.0);
-  vec2 perpDir = vec2(-flowDir.y, flowDir.x);
   float velScale = clamp(speed * 0.90, 0.35, 1.75);
 
   if (obstacleSDF > -0.03 && obstacleSDF < 0.95) {
@@ -191,11 +208,9 @@ void main() {
   // C) Downstream wakes & localized counter-rotating vortex surface motion
   if (turbulence > 0.04) {
     float turbEnergy = min(1.45, turbulence * (0.65 + 0.45 * speed));
-    // Counter-rotating vortex eddy coordinates advected with local flow
-    float ang1 = uTime * 0.42;
-    float ang2 = -uTime * 0.36;
-    mat2 rotV1 = mat2(cos(ang1), -sin(ang1), sin(ang1), cos(ang1));
-    mat2 rotV2 = mat2(cos(ang2), -sin(ang2), sin(ang2), cos(ang2));
+    // Precomputed vertex rotation matrices for counter-rotating vortex eddy coordinates
+    mat2 rotV1 = mat2(vVortexRot.x, -vVortexRot.y, vVortexRot.y, vVortexRot.x);
+    mat2 rotV2 = mat2(vVortexRot.z, -vVortexRot.w, vVortexRot.w, vVortexRot.z);
 
     vec2 advCenter1 = vWorldPos.xz - velocity * fract(uTime * 0.38) * 1.45;
     vec2 advCenter2 = vWorldPos.xz - velocity * fract(uTime * 0.38 + 0.5) * 1.45 + vec2(2.17, 3.83);
@@ -343,18 +358,40 @@ void main() {
     // Soft Reinhard shoulder on sky reflections prevents forward-scattered horizon glare from blowing out
     vec3 skyEnv = (rawSkyEnv / (vec3(1.0) + rawSkyEnv * 0.48)) * 0.66;
 
-    // 3-step local rock & bank heightfield reflection occlusion
+    // 3-step local rock & bank heightfield reflection occlusion with exact max-weight early-out:
+    // Step s has maximum possible weight 1/s (1.0, 0.5, 0.3333), so later steps cannot increase
+    // localOcclusion once an earlier step exceeds their maximum possible contribution.
     float localOcclusion = 0.0;
     vec3 localRockReflectCol = vec3(0.22, 0.23, 0.21) * max(0.42, uSunDir.y);
-    for (int s = 1; s <= 3; s++) {
-      float stepDist = float(s) * 0.36;
-      vec2 rayXZ = vWorldPos.xz + R.xz * stepDist;
-      vec2 rayUV = clamp(vec2((rayXZ.x + 8.0) / 16.0, (rayXZ.y + 12.0) / 24.0), 0.0, 1.0);
-      float raySolidY = texture2D(uTerrainMap, rayUV).r;
-      float rayHeight = vWorldPos.y + R.y * stepDist * 0.50;
-      if (raySolidY > rayHeight) {
-        float hitWeight = smoothstep(rayHeight, rayHeight + 0.22, raySolidY) / float(s);
-        localOcclusion = max(localOcclusion, hitWeight);
+
+    // Step 1 (s = 1, max weight = 1.0)
+    vec2 rayXZ1 = vWorldPos.xz + R.xz * 0.36;
+    vec2 rayUV1 = clamp(vec2((rayXZ1.x + 8.0) * 0.0625, (rayXZ1.y + 12.0) * 0.04166667), 0.0, 1.0);
+    float raySolidY1 = texture2D(uTerrainMap, rayUV1).r;
+    float rayHeight1 = vWorldPos.y + R.y * 0.18;
+    if (raySolidY1 > rayHeight1) {
+      localOcclusion = smoothstep(rayHeight1, rayHeight1 + 0.22, raySolidY1);
+    }
+
+    // Step 2 (s = 2, max weight = 0.5)
+    if (localOcclusion < 0.5) {
+      vec2 rayXZ2 = vWorldPos.xz + R.xz * 0.72;
+      vec2 rayUV2 = clamp(vec2((rayXZ2.x + 8.0) * 0.0625, (rayXZ2.y + 12.0) * 0.04166667), 0.0, 1.0);
+      float raySolidY2 = texture2D(uTerrainMap, rayUV2).r;
+      float rayHeight2 = vWorldPos.y + R.y * 0.36;
+      if (raySolidY2 > rayHeight2) {
+        localOcclusion = max(localOcclusion, smoothstep(rayHeight2, rayHeight2 + 0.22, raySolidY2) * 0.5);
+      }
+    }
+
+    // Step 3 (s = 3, max weight = 0.33333334)
+    if (localOcclusion < 0.33333334) {
+      vec2 rayXZ3 = vWorldPos.xz + R.xz * 1.08;
+      vec2 rayUV3 = clamp(vec2((rayXZ3.x + 8.0) * 0.0625, (rayXZ3.y + 12.0) * 0.04166667), 0.0, 1.0);
+      float raySolidY3 = texture2D(uTerrainMap, rayUV3).r;
+      float rayHeight3 = vWorldPos.y + R.y * 0.54;
+      if (raySolidY3 > rayHeight3) {
+        localOcclusion = max(localOcclusion, smoothstep(rayHeight3, rayHeight3 + 0.22, raySolidY3) * 0.33333334);
       }
     }
 
@@ -402,7 +439,7 @@ void main() {
 
     if (foamPotential > 0.04) {
       float cyclePeriod = 2.5;
-      float pOffset = texture2D(uNoiseTex, vWorldPos.xz * 0.075).b * 0.65;
+      float pOffset = lowFreqNoiseB * 0.65;
       float tFoam = uTime / cyclePeriod + pOffset;
       float fp0 = fract(tFoam);
       float fp1 = fract(tFoam + 0.5);

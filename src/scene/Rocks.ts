@@ -26,6 +26,7 @@ export class Rocks {
     envMap: THREE.CubeTexture
   ) {
     this.group = new THREE.Group();
+    this.group.matrixAutoUpdate = false;
 
     this.rockMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -35,7 +36,7 @@ export class Rocks {
       envMap,
       envMapIntensity: 0.58
     });
-    enhanceUnderwaterStoneMaterial(this.rockMaterial, sharedUniforms, true);
+    enhanceUnderwaterStoneMaterial(this.rockMaterial, sharedUniforms, false);
 
     for (let i = 0; i < flowField.rocks.length; i++) {
       const desc = flowField.rocks[i];
@@ -45,6 +46,9 @@ export class Rocks {
       mesh.rotation.set(desc.rotationX, desc.rotationY, desc.rotationZ);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.renderOrder = -3;
+      mesh.matrixAutoUpdate = false;
+      mesh.updateMatrix();
       this.meshes.push(mesh);
       this.group.add(mesh);
     }
@@ -357,6 +361,9 @@ export class Rocks {
       mesh.rotation.set(desc.rotationX, desc.rotationY, desc.rotationZ);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.renderOrder = -3;
+      mesh.matrixAutoUpdate = false;
+      mesh.updateMatrix();
       this.meshes.push(mesh);
       this.group.add(mesh);
     });

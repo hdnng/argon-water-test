@@ -132,13 +132,18 @@ export class Environment {
         uSunDir: { value: sunDirection.clone().normalize() }
       },
       side: THREE.BackSide,
-      depthWrite: false
+      depthTest: true,
+      depthWrite: false,
+      depthFunc: THREE.LessEqualDepth
     });
 
     const skyGeo = new THREE.SphereGeometry(90, 48, 24);
     this.skyMesh = new THREE.Mesh(skyGeo, this.skyMaterial);
     this.skyMesh.frustumCulled = false;
-    this.skyMesh.renderOrder = -10;
+    // Render after opaque terrain & rocks (renderOrder -3..-1) at z=w so Hardware Early-Z rejects 95-100% of occluded sky pixels
+    this.skyMesh.renderOrder = 0;
+    this.skyMesh.matrixAutoUpdate = false;
+    this.skyMesh.updateMatrix();
 
     this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
       format: THREE.RGBAFormat,

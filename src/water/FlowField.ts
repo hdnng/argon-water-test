@@ -121,12 +121,20 @@ export class FlowField {
     this.initRockDescriptors();
     this.bakeFields();
 
+    const len = resolution * resolution * 4;
+    const flowHalf = new Uint16Array(len);
+    const terrainHalf = new Uint16Array(len);
+    for (let i = 0; i < len; i++) {
+      flowHalf[i] = THREE.DataUtils.toHalfFloat(this.flowData[i]);
+      terrainHalf[i] = THREE.DataUtils.toHalfFloat(this.terrainData[i]);
+    }
+
     this.flowTexture = new THREE.DataTexture(
-      this.flowData as unknown as BufferSource,
+      flowHalf as unknown as BufferSource,
       resolution,
       resolution,
       THREE.RGBAFormat,
-      THREE.FloatType
+      THREE.HalfFloatType
     );
     this.flowTexture.wrapS = THREE.ClampToEdgeWrapping;
     this.flowTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -135,11 +143,11 @@ export class FlowField {
     this.flowTexture.needsUpdate = true;
 
     this.terrainTexture = new THREE.DataTexture(
-      this.terrainData as unknown as BufferSource,
+      terrainHalf as unknown as BufferSource,
       resolution,
       resolution,
       THREE.RGBAFormat,
-      THREE.FloatType
+      THREE.HalfFloatType
     );
     this.terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
     this.terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -904,17 +912,25 @@ export class FlowField {
   }
 
   public sampleFlow(x: number, z: number): { vx: number; vz: number; turbulence: number; sdf: number } {
+    const out = { vx: 0, vz: 0, turbulence: 0, sdf: 0 };
+    this.sampleFlowInto(x, z, out);
+    return out;
+  }
+
+  public sampleFlowInto(
+    x: number,
+    z: number,
+    out: { vx: number; vz: number; turbulence: number; sdf: number }
+  ): void {
     const u = Math.max(0.0, Math.min(1.0, (x - STREAM_DOMAIN.minX) / STREAM_DOMAIN.width));
     const v = Math.max(0.0, Math.min(1.0, (z - STREAM_DOMAIN.minZ) / STREAM_DOMAIN.length));
     const ix = Math.min(this.resolution - 1, Math.floor(u * (this.resolution - 1)));
     const iz = Math.min(this.resolution - 1, Math.floor(v * (this.resolution - 1)));
     const idx = (iz * this.resolution + ix) * 4;
-    return {
-      vx: this.flowData[idx + 0],
-      vz: this.flowData[idx + 1],
-      turbulence: this.flowData[idx + 2],
-      sdf: this.flowData[idx + 3]
-    };
+    out.vx = this.flowData[idx + 0];
+    out.vz = this.flowData[idx + 1];
+    out.turbulence = this.flowData[idx + 2];
+    out.sdf = this.flowData[idx + 3];
   }
 
   public dispose(): void {

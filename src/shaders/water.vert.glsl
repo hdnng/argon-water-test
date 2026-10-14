@@ -12,11 +12,8 @@ uniform float uPointerEnabled;
 varying vec3 vWorldPos;
 varying vec4 vClipPos;
 varying vec2 vDomainUV;
-varying vec4 vFlow;         // rg: velocity (vx, vz), b: turbulence, a: obstacleSDF
-varying float vWaterBaseY;
-varying float vSolidY;
-varying vec2 vObsGrad;
-varying float vWaveHeight;
+varying vec2 vMacroSlope;
+varying vec4 vVortexRot;
 
 vec2 worldToDomainUV(vec2 xz) {
   return vec2(
@@ -145,11 +142,17 @@ void main() {
 
   vWorldPos = worldPosition.xyz;
   vDomainUV = domainUV;
-  vFlow = flow;
-  vWaterBaseY = waterBaseY;
-  vSolidY = solidY;
-  vObsGrad = obsGrad;
-  vWaveHeight = waveDisp;
+
+  float eps = 0.085;
+  float hR = texture2D(uTerrainMap, clamp(domainUV + vec2(eps / 16.0, 0.0), 0.0, 1.0)).g;
+  float hL = texture2D(uTerrainMap, clamp(domainUV - vec2(eps / 16.0, 0.0), 0.0, 1.0)).g;
+  float hU = texture2D(uTerrainMap, clamp(domainUV + vec2(0.0, eps / 24.0), 0.0, 1.0)).g;
+  float hD = texture2D(uTerrainMap, clamp(domainUV - vec2(0.0, eps / 24.0), 0.0, 1.0)).g;
+  vMacroSlope = vec2((hR - hL) / (2.0 * eps), (hU - hD) / (2.0 * eps));
+
+  float ang1 = uTime * 0.42;
+  float ang2 = -uTime * 0.36;
+  vVortexRot = vec4(cos(ang1), sin(ang1), cos(ang2), sin(ang2));
 
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
   vClipPos = gl_Position;

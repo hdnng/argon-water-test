@@ -20,6 +20,9 @@ varying float vChuteStrength;
 varying float vRockClearance;
 varying float vLayerType;
 varying float vFallProgress;
+varying float vTau;
+varying float vEnvBell;
+varying vec2 vDomainUV;
 
 void main() {
   vUv = uv;
@@ -31,6 +34,7 @@ void main() {
 
   // Physical free-fall travel-time integral tau(v): progressively stretches waves as water accelerates under gravity
   float tau = (sqrt(1.0 + 3.4 * vFallProgress) - 1.0) / 1.7;
+  vTau = tau;
 
   vec2 seedVec = vec2(fract(vChuteSeed * 0.173), fract(vChuteSeed * 0.319));
   vec2 nUv1 = vec2(uv.x * 0.62 + seedVec.x, tau * 0.58 - uTime * 0.54);
@@ -42,6 +46,7 @@ void main() {
   vec4 noise2 = texture2D(uNoiseTex, nUv2);
 
   float envBell = sin(vFallProgress * 3.14159265);
+  vEnvBell = envBell;
   float clearanceMask = smoothstep(0.0, 0.35, vRockClearance);
 
   // 1. Broad organic sheet billow & variable liquid lobe thickness
@@ -66,6 +71,7 @@ void main() {
 
   vec4 wp = modelMatrix * vec4(displaced, 1.0);
   vWorldPos = wp.xyz;
+  vDomainUV = vec2((wp.x + 8.0) * 0.0625, (wp.z + 12.0) * 0.04166667);
   vNormal = normalize(mat3(modelMatrix) * perturbedNormal);
   vTangent = normalize(mat3(modelMatrix) * aTangent);
 
@@ -98,6 +104,9 @@ varying float vChuteStrength;
 varying float vRockClearance;
 varying float vLayerType;
 varying float vFallProgress;
+varying float vTau;
+varying float vEnvBell;
+varying vec2 vDomainUV;
 
 // Exact unpolarized dielectric Fresnel equation for air -> freshwater (IOR = 1.333)
 float dielectricFresnel(float cosThetaI, float ior) {
@@ -112,7 +121,7 @@ float dielectricFresnel(float cosThetaI, float ior) {
 
 void main() {
   // Sample live obstacle SDF & terrain height to guarantee zero hard intersections with boulders
-  vec2 domainUV = clamp(vec2((vWorldPos.x + 8.0) / 16.0, (vWorldPos.z + 12.0) / 24.0), 0.0, 1.0);
+  vec2 domainUV = clamp(vDomainUV, 0.0, 1.0);
   vec4 flowSample = texture2D(uFlowMap, domainUV);
   vec4 terrainSample = texture2D(uTerrainMap, domainUV);
   float obstacleSDF = flowSample.a;
@@ -126,9 +135,8 @@ void main() {
                       smoothstep(-0.012, 0.035, vWorldPos.y - solidY) *
                       smoothstep(0.0, 0.18, vRockClearance);
 
-  // Physical free-fall travel-time coordinate tau: matches upstream ripple scale at v=0
-  // and progressively stretches along the accelerating drop under gravity
-  float tau = (sqrt(1.0 + 3.4 * vFallProgress) - 1.0) / 1.7;
+  // Physical free-fall travel-time coordinate tau interpolated from vertex shader
+  float tau = vTau;
 
   vec2 seedVec = vec2(fract(vChuteSeed * 0.193), fract(vChuteSeed * 0.371));
 
@@ -142,7 +150,7 @@ void main() {
   // Organic, non-periodic lateral edge undulation (avoids straight chute borders)
   vec2 edgeUv = vec2(tau * 0.52 - uTime * 0.44, vChuteSeed * 0.23 + vUv.x * 0.35);
   vec4 edgeNoise = texture2D(uNoiseTex, edgeUv);
-  float edgeWarp = ((edgeNoise.r - 0.5) * 0.34 + (edgeNoise.b - 0.5) * 0.22) * sin(vFallProgress * 3.14159265);
+  float edgeWarp = ((edgeNoise.r - 0.5) * 0.34 + (edgeNoise.b - 0.5) * 0.22) * vEnvBell;
 
   float rawCenteredX = vUv.x * 2.0 - 1.0;
   float lateralCoord = rawCenteredX + edgeWarp;
@@ -157,7 +165,7 @@ void main() {
 
   // --- Multi-Scale Domain-Warped Flowing Water Sheets, Braided Lobes & Detached Droplets ---
   // Slight vena-contracta convergence in mid-drop followed by impact flare
-  float streamX = lateralCoord * (0.78 + 0.22 * sin(vFallProgress * 3.14159265) - 0.14 * vFallProgress * vFallProgress);
+  float streamX = lateralCoord * (0.78 + 0.22 * vEnvBell - 0.14 * vFallProgress * vFallProgress);
 
   // Layer 1: Broad domain-warped water sheet billows (thick glossy cores vs thin translucent films)
   vec2 baseUv0 = vec2(streamX * 0.58 + seedVec.x, tau * 0.54 - p0 * 0.58);
@@ -404,6 +412,8 @@ export class Waterfall {
 
     this.sheetMesh = new THREE.Mesh(sheetGeo, this.sheetMaterial);
     this.sheetMesh.renderOrder = 2;
+    this.sheetMesh.matrixAutoUpdate = false;
+    this.sheetMesh.updateMatrix();
     this.group.add(this.sheetMesh);
 
     this.sprayGeometry = this.buildSprayGeometry(flowField, 550);
@@ -424,7 +434,12 @@ export class Waterfall {
 
     this.sprayPoints = new THREE.Points(this.sprayGeometry, this.sprayMaterial);
     this.sprayPoints.renderOrder = 4;
+    this.sprayPoints.matrixAutoUpdate = false;
+    this.sprayPoints.updateMatrix();
     this.group.add(this.sprayPoints);
+
+    this.group.matrixAutoUpdate = false;
+    this.group.updateMatrix();
   }
 
   /**

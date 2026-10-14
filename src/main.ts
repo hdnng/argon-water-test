@@ -20,7 +20,12 @@ import { WaterMaterial } from './water/WaterMaterial';
 import { WaterSurface } from './water/WaterSurface';
 import { FoamSystem } from './water/FoamSystem';
 import { Waterfall } from './water/Waterfall';
-import { PerformanceMonitor } from './ui/PerformanceMonitor';
+import {
+  PerformanceMonitor,
+  BenchmarkScenarioName,
+  BenchmarkOptions,
+  BenchmarkResult
+} from './ui/PerformanceMonitor';
 import { DebugPanel, CameraPresetName } from './ui/DebugPanel';
 
 const POST_VERT = /* glsl */ `
@@ -88,8 +93,10 @@ void main() {
   }
 
   // Compact 5-tap rotated-grid bloom for solar water sparkles only
+  // Reuse already-fetched center texel instead of issuing a duplicate full-screen texture2D read
   vec2 r1 = uTexelSize * 3.0;
-  vec3 bloom = sampleHighlight(vUv) * 0.28;
+  float centerLum = dot(center, vec3(0.2126, 0.7152, 0.0722));
+  vec3 bloom = (center * smoothstep(1.48, 2.85, centerLum)) * 0.28;
   bloom += sampleHighlight(vUv + vec2(r1.x, r1.y)) * 0.18;
   bloom += sampleHighlight(vUv + vec2(-r1.x, r1.y)) * 0.18;
   bloom += sampleHighlight(vUv + vec2(r1.x, -r1.y)) * 0.18;
@@ -340,9 +347,18 @@ class WaterSimulationApp {
         onPauseToggle: (paused) => {
           this.paused = paused;
         },
-        onRunBenchmark: () => this.startReproducibleBenchmark()
+        onRunBenchmark: (scenario) => {
+          void this.startReproducibleBenchmark({ scenario });
+        }
       }
     );
+
+    (window as any).__waterApp = this;
+
+    // Precompute static scene-graph world matrices once
+    this.scene.updateMatrixWorld(true);
+    this.postScene.updateMatrixWorld(true);
+    this.postScene.matrixWorldAutoUpdate = false;
 
     this.updateViewportSize();
     this.bindEvents();
@@ -499,7 +515,7 @@ class WaterSimulationApp {
     return true;
   }
 
-  private applyPreset(presetName: QualityPresetName): void {
+  public applyPreset(presetName: QualityPresetName): void {
     this.quality = cloneQualityConfig(presetName);
     this.adaptiveScale = 1.0;
     this.debugPanel.syncState(this.quality.name, this.quality.toggles);
@@ -538,7 +554,7 @@ class WaterSimulationApp {
       this.quality.toggles.postprocessing ? 1.0 : 0.0;
   }
 
-  private applyFeatureToggle(key: keyof FeatureToggles, value: boolean): void {
+  public applyFeatureToggle(key: keyof FeatureToggles, value: boolean): void {
     this.quality.toggles[key] = value;
     this.waterMaterial.applyQuality(this.quality);
 
@@ -567,15 +583,19 @@ class WaterSimulationApp {
     }
   }
 
-  private startReproducibleBenchmark(): void {
-    if (this.perfMonitor.isBenchmarkRunning) return;
+  public startReproducibleBenchmark(options?: BenchmarkOptions): Promise<BenchmarkResult> {
+    if (this.perfMonitor.isBenchmarkRunning) {
+      return Promise.reject(new Error('Benchmark already running'));
+    }
 
-    // Lock deterministic test conditions: Cinematic camera view, unpaused flow, fixed resolution scale
+    const scenario: BenchmarkScenarioName = options?.scenario ?? 'overview';
+
+    // Lock deterministic test conditions: fixed camera pose, reset animation clock, fixed resolution scale
     this.paused = false;
+    this.elapsedTime = 0;
     this.camTransition.active = false;
-    this.camera.position.set(1.95, 0.96, 5.15);
-    this.controls.target.set(-0.15, 0.14, -0.85);
-    this.controls.update();
+
+    this.applyScenarioCameraPose(scenario, 0);
 
     if (this.adaptiveScale !== 1.0) {
       this.adaptiveScale = 1.0;
@@ -583,9 +603,42 @@ class WaterSimulationApp {
     }
 
     this.debugPanel.setBenchmarkRunning(true);
-    this.perfMonitor.startBenchmark(() => {
-      this.debugPanel.setBenchmarkRunning(false);
+    return new Promise<BenchmarkResult>((resolve) => {
+      this.perfMonitor.startBenchmark(
+        (res) => {
+          this.debugPanel.setBenchmarkRunning(false);
+          resolve(res);
+        },
+        options
+      );
     });
+  }
+
+  public applyScenarioCameraPose(scenario: BenchmarkScenarioName, elapsedSec = 0): void {
+    if (scenario === 'overview') {
+      this.camera.position.set(3.85, 4.45, 5.65);
+      this.controls.target.set(0.0, 0.12, -0.45);
+    } else if (scenario === 'waterfall') {
+      this.camera.position.set(1.42, 0.86, 0.42);
+      this.controls.target.set(-0.12, 0.24, -1.92);
+    } else if (scenario === 'boulders') {
+      this.camera.position.set(0.95, 0.52, 3.72);
+      this.controls.target.set(0.32, 0.06, 2.45);
+    } else if (scenario === 'orbit') {
+      const angle = elapsedSec * 0.42;
+      this.camera.position.set(
+        Math.cos(angle) * 2.45 + 0.35 * Math.sin(angle * 0.5),
+        0.92 + 0.32 * Math.sin(elapsedSec * 0.31),
+        2.15 + Math.sin(angle) * 2.55
+      );
+      this.controls.target.set(
+        -0.10 + 0.28 * Math.sin(angle * 0.7),
+        0.14,
+        -0.55 + 0.95 * Math.cos(angle * 0.6)
+      );
+    }
+    this.controls.update();
+    this.camera.updateMatrixWorld();
   }
 
   private updateAdaptiveResolution(now: number): void {
@@ -705,6 +758,8 @@ class WaterSimulationApp {
   private animate = (): void => {
     requestAnimationFrame(this.animate);
 
+    this.perfMonitor.beginCpuFrame();
+
     const now = performance.now();
     const dt = Math.min(0.05, (now - this.lastTimestamp) / 1000.0);
     this.lastTimestamp = now;
@@ -715,7 +770,12 @@ class WaterSimulationApp {
 
     this.updateAdaptiveResolution(now);
 
-    if (this.camTransition.active) {
+    if (
+      this.perfMonitor.isBenchmarkRunning &&
+      this.perfMonitor.currentBenchmarkScenario === 'orbit'
+    ) {
+      this.applyScenarioCameraPose('orbit', this.elapsedTime);
+    } else if (this.camTransition.active) {
       const t = Math.min(
         1.0,
         (now - this.camTransition.startTime) / (this.camTransition.duration * 1000.0)
@@ -734,9 +794,10 @@ class WaterSimulationApp {
       if (t >= 1.0) {
         this.camTransition.active = false;
       }
+      this.controls.update();
+    } else {
+      this.controls.update();
     }
-
-    this.controls.update();
 
     this.renderer.info.reset();
     this.perfMonitor.beginGpuFrame();
