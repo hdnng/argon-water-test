@@ -201,20 +201,19 @@ export function enhanceUnderwaterStoneMaterial(
       vec4 rockMacro = mix(rockMacroSide, rockMacroTop, topBlend);
 
       // High-frequency crystalline mineral grain & micro-pores (filtered with distance to prevent shimmering)
-      vec2 uvMicro = mix(uvSide, uvTop, topBlend) * 2.85 + vec2(rockMacro.b * 0.08);
+      vec2 uvMicro = mix(uvSide, uvTop, topBlend) * 2.85;
       vec4 rockMicro = texture2D(uRockDetailTex, uvMicro);
 
       float crackDensity = vRockParams.y;
       float baseRoughParam = vRockParams.z;
       float mossCoverageParam = vRockParams.w;
 
-      // Sparse localized crevices: rockMacro.b is ~0.52 on smooth stone faces and < 0.40 only in localized joints
-      float rawCrack = smoothstep(0.43, 0.14, rockMacro.b) * crackDensity;
-      float microPit = smoothstep(0.38, 0.16, rockMicro.b) * crackDensity * 0.35 * distAtten;
-      float sparseCreviceMask = clamp(rawCrack + microPit, 0.0, 0.85);
-      float creviceAO = 1.0 - sparseCreviceMask * 0.58;
+      // Sparse localized crevices: rockMacro.b is ~0.52 on smooth stone faces and < 0.38 only in localized joints
+      float rawCrack = smoothstep(0.40, 0.14, rockMacro.b) * crackDensity;
+      float microPit = smoothstep(0.36, 0.16, rockMicro.b) * crackDensity * 0.30 * distAtten;
+      float sparseCreviceMask = clamp(rawCrack + microPit, 0.0, 0.80);
 
-      float mineralSpeckle = mix(0.5, rockMicro.a, 0.55 + 0.45 * distAtten);
+      float mineralSpeckle = mix(0.5, rockMicro.a, 0.58 + 0.42 * distAtten);
 
       // Actual water surface elevation with subtle wave lap, turbulence splash, and porous capillary wicking
       float lapWave = 0.009 * sin(uTime * 2.7 + vWorldPos.x * 3.1 - vWorldPos.z * 2.3);
@@ -227,92 +226,88 @@ export function enhanceUnderwaterStoneMaterial(
         isPebbleOrRock
           ? /* glsl */ `
           // --- Multi-Scale Natural River Boulder & Cobble PBR Material ---
-          // 1. Macro Scale: Broad mineral variation & subtle crystalline grain (smooth faces remain clean!)
+          // 1. Macro Scale: Broad mineral variation & crystalline grain (no periodic sine bands or blue color shifts)
           float grainMod = 0.88 + 0.24 * (mineralSpeckle - 0.5) * (0.65 + 0.35 * distAtten);
           vec3 baseStone = diffuseColor.rgb * grainMod;
 
-          // Subtle, low-frequency geological mineral banding (NO repetitive high-frequency zebra stripes!)
-          float bandCoord = vLocalPos.y * 1.35 + vLocalPos.x * 0.55 + (weatherNoise.r - 0.5) * 0.85;
-          float softBand = smoothstep(0.25, 0.75, 0.5 + 0.5 * sin(bandCoord * 3.14159 + uvAngle));
-          vec3 mineralWarm = baseStone * vec3(1.08, 1.01, 0.92);
-          vec3 mineralCool = baseStone * vec3(0.91, 0.95, 1.00);
-          baseStone = mix(mineralCool, mineralWarm, softBand);
+          float mineralTone = smoothstep(0.20, 0.80, weatherNoise.r * 0.62 + rockMacro.a * 0.38);
+          baseStone *= mix(vec3(0.95, 0.94, 0.93), vec3(1.05, 1.03, 1.00), mineralTone);
 
-          // 2. Medium Scale: Sparse localized erosion cracks & darker mineral joints
-          vec3 crackTint = baseStone * vec3(0.46, 0.48, 0.50);
-          baseStone = mix(baseStone, crackTint, sparseCreviceMask * 0.72);
+          // 2. Medium Scale: Sparse localized erosion cracks & neutral dark mineral joints
+          vec3 crackTint = baseStone * vec3(0.54, 0.52, 0.50);
+          baseStone = mix(baseStone, crackTint, sparseCreviceMask * 0.62);
 
           // Occasional thin quartz / feldspar mineral veins (localized, non-uniform)
-          float veinMask = smoothstep(0.76, 0.91, rockMacro.b) *
-                           smoothstep(0.46, 0.78, weatherNoise.g) *
-                           (0.25 + 0.65 * crackDensity);
-          vec3 quartzVeinCol = mix(baseStone * 1.28, vec3(0.68, 0.65, 0.59), 0.55);
-          baseStone = mix(baseStone, quartzVeinCol, veinMask * 0.42);
+          float veinMask = smoothstep(0.78, 0.92, rockMacro.b) *
+                           smoothstep(0.48, 0.78, weatherNoise.g) *
+                           (0.22 + 0.58 * crackDensity);
+          vec3 quartzVeinCol = mix(baseStone * 1.22, vec3(0.66, 0.63, 0.58), 0.50);
+          baseStone = mix(baseStone, quartzVeinCol, veinMask * 0.36);
 
-          // Occasional darker mineral inclusions / hornblende veins
-          float darkVein = smoothstep(0.26, 0.14, rockMacro.b) * smoothstep(0.55, 0.82, weatherNoise.r) * crackDensity;
-          baseStone = mix(baseStone, baseStone * vec3(0.55, 0.58, 0.62), darkVein * 0.45);
+          // Occasional darker neutral mineral inclusions
+          float darkVein = smoothstep(0.25, 0.13, rockMacro.b) * smoothstep(0.55, 0.82, weatherNoise.r) * crackDensity;
+          baseStone = mix(baseStone, baseStone * vec3(0.62, 0.60, 0.58), darkVein * 0.40);
 
           // Naturally worn, slightly paler mineral edges on upper exposed shoulders
           float wornShoulder = smoothstep(0.25, 0.85, Wn.y) * smoothstep(0.04, 0.28, rawHeightAboveWater) * (1.0 - sparseCreviceMask);
-          baseStone = mix(baseStone, baseStone * 1.09 + vec3(0.025, 0.022, 0.018), wornShoulder * 0.32);
+          baseStone = mix(baseStone, baseStone * 1.08 + vec3(0.022, 0.020, 0.017), wornShoulder * 0.30);
 
           // 3. Irregular alluvial sediment deposits in upward-facing low pockets & concavities
-          float sedimentPocket = smoothstep(0.36, 0.86, Wn.y) *
-                                 smoothstep(0.18, -0.25, rawHeightAboveWater) *
-                                 smoothstep(0.35, 0.72, weatherNoise.b * 0.6 + (1.0 - rockMacro.a) * 0.4);
-          vec3 alluvialSilt = vec3(0.39, 0.34, 0.26);
-          baseStone = mix(baseStone, alluvialSilt, sedimentPocket * 0.38);
+          float sedimentPocket = smoothstep(0.38, 0.86, Wn.y) *
+                                 smoothstep(0.16, -0.22, rawHeightAboveWater) *
+                                 smoothstep(0.38, 0.74, weatherNoise.b * 0.6 + (1.0 - rockMacro.a) * 0.4);
+          vec3 alluvialSilt = vec3(0.38, 0.33, 0.26);
+          baseStone = mix(baseStone, alluvialSilt, sedimentPocket * 0.32);
 
           // 4. Submerged river periphyton / olive-brown mineral microfilm in deeper water
-          float submergedBiofilm = smoothstep(-0.03, -0.24, rawHeightAboveWater) *
-                                   smoothstep(0.15, 0.82, Wn.y) *
-                                   smoothstep(0.32, 0.75, weatherNoise.b);
-          baseStone = mix(baseStone, vec3(0.24, 0.26, 0.17), submergedBiofilm * 0.34);
+          float submergedBiofilm = smoothstep(-0.04, -0.26, rawHeightAboveWater) *
+                                   smoothstep(0.18, 0.82, Wn.y) *
+                                   smoothstep(0.35, 0.76, weatherNoise.b);
+          baseStone = mix(baseStone, vec3(0.25, 0.26, 0.18), submergedBiofilm * 0.28);
 
           // 5. Per-rock deterministic alpine moss & lichen on dry upper crowns
           if (mossCoverageParam > 0.02) {
-            float upFacing = smoothstep(0.32, 0.76, Wn.y);
+            float upFacing = smoothstep(0.34, 0.76, Wn.y);
             float aboveSplash = smoothstep(0.03, 0.14, heightAboveWater);
             float mossPattern = weatherNoise.b * 0.58 + rockMacro.a * 0.42;
             float mossThreshold = clamp(0.68 - mossCoverageParam * 0.42, 0.24, 0.66);
             float mossMask = upFacing * aboveSplash *
                              smoothstep(mossThreshold, mossThreshold + 0.22, mossPattern) *
                              clamp(mossCoverageParam * 1.25, 0.0, 0.88);
-            vec3 mossDark = vec3(0.14, 0.20, 0.09);
-            vec3 mossOlive = vec3(0.25, 0.32, 0.14);
+            vec3 mossDark = vec3(0.15, 0.20, 0.10);
+            vec3 mossOlive = vec3(0.25, 0.31, 0.15);
             vec3 mossCol = mix(mossDark, mossOlive, smoothstep(0.3, 0.75, rockMicro.a));
             baseStone = mix(baseStone, mossCol, mossMask);
           }
 
           // 6. Gentle hemisphere grounding (avoids artificial black base outlines!)
-          float hemisphereShade = 0.80 + 0.20 * smoothstep(-0.55, 0.28, Wn.y);
+          float hemisphereShade = 0.82 + 0.18 * smoothstep(-0.55, 0.28, Wn.y);
           diffuseColor.rgb = baseStone * hemisphereShade;
           `
           : /* glsl */ `
           // --- Non-Repetitive Alluvial Riverbed & Eroded Mountain Bank Material ---
-          // Dual-scale aperiodic domain warping + incommensurate rotated UV sampling
+          // Dual-scale aperiodic rotated UV sampling (without wave-slope domain-warp swirls)
           vec4 macroZoneTex = texture2D(uNoiseTex, vWorldPos.xz * 0.038 + vec2(0.17, 0.43));
-          vec2 bankWarp = (weatherNoise.rg - 0.5) * 1.35 + (macroZoneTex.rg - 0.5) * 2.10;
+          vec2 bankWarp = (macroZoneTex.ba - 0.5) * 0.55;
           vec2 warpedXZ = vWorldPos.xz + bankWarp;
 
           mat2 rotBankA = mat2(0.920, -0.391, 0.391, 0.920); // +23 deg
           mat2 rotBankB = mat2(0.755, 0.656, -0.656, 0.755); // -41 deg
-          vec4 bedSampleA = texture2D(uRockDetailTex, (rotBankA * warpedXZ) * 0.31);
-          vec4 bedSampleB = texture2D(uRockDetailTex, (rotBankB * warpedXZ) * 0.53 + vec2(0.37, 0.61));
+          vec4 bedSampleA = texture2D(uRockDetailTex, (rotBankA * warpedXZ) * 0.34);
+          vec4 bedSampleB = texture2D(uRockDetailTex, (rotBankB * warpedXZ) * 0.57 + vec2(0.37, 0.61));
           float zoneBlend = smoothstep(0.28, 0.72, macroZoneTex.b);
           vec4 bedMacro = mix(bedSampleA, bedSampleB, zoneBlend);
 
-          vec4 bedFine = texture2D(uRockDetailTex, (rotBankA * vWorldPos.xz) * 1.35 + vec2(bedMacro.b * 0.14));
-          float gravelCrevice = 1.0 - smoothstep(0.42, 0.16, bedFine.b) * 0.38 * distAtten;
-          float pebbleGrain = mix(0.5, bedFine.a, 0.65 * distAtten);
+          vec4 bedFine = texture2D(uRockDetailTex, (rotBankA * vWorldPos.xz) * 1.35);
+          float gravelCrevice = 1.0 - smoothstep(0.40, 0.15, bedFine.b) * 0.34 * distAtten;
+          float pebbleGrain = mix(0.5, bedFine.a, 0.68 * distAtten);
 
-          vec3 slateBedrock = vec3(0.22, 0.25, 0.27);
+          vec3 slateBedrock = vec3(0.27, 0.26, 0.25);
           vec3 warmRiverGravel = vec3(0.42, 0.35, 0.27);
           vec3 weatheredSandstone = vec3(0.46, 0.38, 0.29);
           vec3 alluvialSandSilt = vec3(0.48, 0.41, 0.32);
-          vec3 erodedEarthLoam = vec3(0.31, 0.26, 0.20);
-          vec3 upperBankShale = vec3(0.35, 0.33, 0.29);
+          vec3 erodedEarthLoam = vec3(0.32, 0.27, 0.21);
+          vec3 upperBankShale = vec3(0.36, 0.34, 0.30);
 
           // Channel bed variation: scoured slate bedrock in fast chutes, warm cobble/gravel bars, and fine sand in slow eddies
           vec3 bedCol = mix(slateBedrock, warmRiverGravel, smoothstep(0.28, 0.72, bedMacro.a));
@@ -579,9 +574,9 @@ export class Riverbed {
     // Coherent 12-tone mountain river mineral palette matching the 5 boulder families
     const palette = [
       [0.46, 0.38, 0.29], // Warm sedimentary sandstone
-      [0.26, 0.29, 0.31], // Dark weathered slate
+      [0.31, 0.30, 0.29], // Dark weathered slate
       [0.54, 0.49, 0.43], // Smooth pale granodiorite
-      [0.22, 0.24, 0.26], // Dark wet mineral basalt
+      [0.26, 0.25, 0.24], // Dark wet mineral basalt
       [0.42, 0.35, 0.27], // Sienna river cobble
       [0.34, 0.35, 0.31], // Olive-gray greywacke
       [0.56, 0.51, 0.45], // Pale quartzite river stone
