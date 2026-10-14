@@ -192,49 +192,55 @@ export function createRockDetailTexture(size = 512): THREE.DataTexture {
       const u = x / size;
       const pIdx = y * size + x;
 
-      // Domain-warped coordinates for natural angular rock cleavage and fractures
-      const wU = u + (tileableFbm(u, v, 3, 3, 311) - 0.5) * 0.16;
-      const wV = v + (tileableFbm(u, v, 3, 3, 419) - 0.5) * 0.16;
+      // Subtle domain-warped coordinates for natural rock cleavage without wavy brain-like squiggles
+      const wU = u + (tileableFbm(u, v, 3, 2, 311) - 0.5) * 0.06;
+      const wV = v + (tileableFbm(u, v, 3, 2, 419) - 0.5) * 0.06;
 
-      // 1. Sharp ridged-multifractal rock facets & stepped cleavage planes
-      const ridges = tileableRidged(wU, wV, 4, 4, 523);
-      // 2. Stepped sedimentary/gneiss micro-terraces
-      const strataRaw = tileableFbm(wU * 0.7 + wV * 0.3, wV * 1.4 - wU * 0.2, 6, 3, 617);
-      const terraceSteps = Math.floor(strataRaw * 7.0) / 7.0;
-      const strata = strataRaw * 0.65 + terraceSteps * 0.35;
+      // 1. Broad, natural stone facets & cleavage planes
+      const ridges = tileableRidged(wU, wV, 4, 3, 523);
+      // 2. Gentle metamorphic/sedimentary stone structure
+      const strataRaw = tileableFbm(wU * 0.8 + wV * 0.2, wV * 1.2 - wU * 0.2, 6, 3, 617);
+      const terraceSteps = Math.floor(strataRaw * 5.0) / 5.0;
+      const strata = strataRaw * 0.78 + terraceSteps * 0.22;
 
-      // 3. Sharp narrow fracture cracks carved into the stone
-      const crackNoise1 = Math.abs(tileableNoise(wU, wV, 8, 733) * 2.0 - 1.0);
-      const crackNoise2 = Math.abs(tileableNoise(wU + 0.41, wV + 0.29, 16, 829) * 2.0 - 1.0);
-      const deepCrack = Math.pow(Math.min(1.0, crackNoise1 * 3.2), 0.55) *
-                        Math.pow(Math.min(1.0, crackNoise2 * 3.8), 0.65);
+      // 3. Localized fracture cracks gated by a low-frequency envelope (leaves ~68% of stone face water-worn & clean)
+      const crackGate = Math.max(0.0, Math.min(1.0, (tileableNoise(u, v, 3, 641) - 0.36) / 0.44));
+      const crackNoise1 = Math.abs(tileableNoise(wU, wV, 6, 733) * 2.0 - 1.0);
+      const crackNoise2 = Math.abs(tileableNoise(wU + 0.41, wV + 0.29, 12, 829) * 2.0 - 1.0);
+      const rawCrack =
+        Math.pow(Math.min(1.0, crackNoise1 * 3.4), 0.60) *
+        Math.pow(Math.min(1.0, crackNoise2 * 3.8), 0.65);
+      const deepCrack = 1.0 - (1.0 - rawCrack) * (0.35 + 0.65 * crackGate);
 
-      // 4. High-frequency crystalline granite/cobble surface grit & micro-pits
+      // 4. Unwarped high-frequency crystalline mineral grain & micro-pores (granite/greywacke/sandstone texture)
       const grit =
-        tileableNoise(u, v, 32, 919) * 0.45 +
-        tileableNoise(u, v, 64, 1031) * 0.35 +
-        tileableNoise(u, v, 128, 1153) * 0.20;
+        tileableNoise(u, v, 24, 919) * 0.38 +
+        tileableNoise(u, v, 48, 1031) * 0.36 +
+        tileableNoise(u, v, 96, 1153) * 0.26;
 
       const combinedHeight =
-        (ridges * 0.46 + strata * 0.28 + grit * 0.26) * (0.45 + 0.55 * deepCrack);
+        (ridges * 0.40 + strata * 0.24 + grit * 0.36) * (0.76 + 0.24 * deepCrack);
       rockHeight[pIdx] = combinedHeight;
 
-      // Channel B: Cavity AO (dark in cracks/pits) + bright mineral quartz veins
-      const veinSignal = Math.max(
-        0.0,
-        1.0 - Math.abs(tileableNoise(wU * 1.2 - wV * 0.4, wV * 1.2 + wU * 0.4, 6, 1277) * 2.0 - 0.15) * 9.5
-      );
+      // Channel B: Cavity AO (dark in localized cracks/pits) + subtle mineral quartz veins
+      const veinGate = Math.max(0.0, Math.min(1.0, (tileableNoise(u, v, 4, 1213) - 0.48) / 0.38));
+      const veinSignal =
+        Math.max(
+          0.0,
+          1.0 - Math.abs(tileableNoise(wU * 1.1 - wV * 0.3, wV * 1.1 + wU * 0.3, 5, 1277) * 2.0 - 0.15) * 10.5
+        ) * veinGate;
       const cavityAndVein = Math.max(
         0.0,
-        Math.min(1.0, deepCrack * (0.38 + 0.42 * ridges) + veinSignal * 0.38)
+        Math.min(1.0, deepCrack * (0.42 + 0.36 * ridges) + veinSignal * 0.34)
       );
 
-      // Channel A: High-contrast crystalline mineral speckle (biotite dark flecks vs feldspar/quartz light grains)
-      const crystal1 = tileableNoise(u, v, 48, 1361);
-      const crystal2 = tileableNoise(u, v, 96, 1483);
+      // Channel A: Crisp crystalline mineral speckle (biotite dark flecks vs feldspar/quartz light grains)
+      const crystal1 = tileableNoise(u, v, 32, 1361);
+      const crystal2 = tileableNoise(u, v, 64, 1483);
+      const crystal3 = tileableNoise(u, v, 128, 1597);
       const mineralSpeckle = Math.max(
         0.0,
-        Math.min(1.0, Math.pow(crystal1 * 0.6 + crystal2 * 0.4, 1.25))
+        Math.min(1.0, Math.pow(crystal1 * 0.45 + crystal2 * 0.35 + crystal3 * 0.20, 1.15))
       );
 
       const idx = pIdx * 4;
@@ -244,7 +250,7 @@ export function createRockDetailTexture(size = 512): THREE.DataTexture {
   }
 
   // Pass 2: Prebake crisp analytical normal slopes (dH/du, dH/dv) into R and G
-  const normalStrength = size * 0.068;
+  const normalStrength = size * 0.056;
   for (let y = 0; y < size; y++) {
     const yPrev = (y - 1 + size) % size;
     const yNext = (y + 1) % size;
