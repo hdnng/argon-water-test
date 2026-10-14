@@ -26,6 +26,7 @@ export class FoamSystem {
   private readonly propsArray: Float32Array;
   private readonly offsetAttr: THREE.InstancedBufferAttribute;
   private readonly propsAttr: THREE.InstancedBufferAttribute;
+  private readonly flowSampleScratch = { vx: 0, vz: 0, turbulence: 0, sdf: 0 };
 
   private spawnLocations: Array<{ x: number; z: number; spreadX: number; spreadZ: number; weight: number }> = [];
 
@@ -93,6 +94,8 @@ export class FoamSystem {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 3;
+    this.mesh.matrixAutoUpdate = false;
+    this.mesh.updateMatrix();
   }
 
   private buildSpawnTable(flowField: FlowField): void {
@@ -167,8 +170,9 @@ export class FoamSystem {
     if (randomAge && p.age > 0.01) {
       const steps = 5;
       const stepDt = p.age / steps;
+      const sample = this.flowSampleScratch;
       for (let s = 0; s < steps; s++) {
-        const sample = flowField.sampleFlow(p.x, p.z);
+        flowField.sampleFlowInto(p.x, p.z, sample);
         p.x += sample.vx * stepDt * 0.85;
         p.z += sample.vz * stepDt * 0.85;
       }
@@ -189,7 +193,12 @@ export class FoamSystem {
       this.propsArray[pIdx + 2] = Math.min(1.0, p.age / p.lifetime);
       this.propsArray[pIdx + 3] = p.kind;
     }
+    this.offsetAttr.clearUpdateRanges();
+    this.offsetAttr.addUpdateRange(0, this.activeCount * 3);
     this.offsetAttr.needsUpdate = true;
+
+    this.propsAttr.clearUpdateRanges();
+    this.propsAttr.addUpdateRange(0, this.activeCount * 4);
     this.propsAttr.needsUpdate = true;
   }
 
@@ -198,6 +207,7 @@ export class FoamSystem {
     this.material.uniforms.uTime.value = elapsedTime;
 
     const clampedDt = Math.min(0.05, dt);
+    const flow = this.flowSampleScratch;
     for (let i = 0; i < this.activeCount; i++) {
       const p = this.particles[i];
       p.age += clampedDt;
@@ -205,7 +215,7 @@ export class FoamSystem {
       if (p.age >= p.lifetime || p.z > STREAM_DOMAIN.maxZ - 0.5) {
         this.respawnParticle(p, flowField, false);
       } else {
-        const flow = flowField.sampleFlow(p.x, p.z);
+        flowField.sampleFlowInto(p.x, p.z, flow);
         p.x += flow.vx * clampedDt * 0.88;
         p.z += flow.vz * clampedDt * 0.88;
 
