@@ -353,6 +353,12 @@ class WaterSimulationApp {
 
     (window as any).__waterApp = this;
 
+    // Precompute static scene-graph world matrices once so dual-pass rendering does not re-traverse matrices twice per frame
+    this.scene.updateMatrixWorld(true);
+    this.scene.matrixWorldAutoUpdate = false;
+    this.postScene.updateMatrixWorld(true);
+    this.postScene.matrixWorldAutoUpdate = false;
+
     this.updateViewportSize();
     this.bindEvents();
     this.hideLoadingOverlay();
@@ -508,7 +514,7 @@ class WaterSimulationApp {
     return true;
   }
 
-  private applyPreset(presetName: QualityPresetName): void {
+  public applyPreset(presetName: QualityPresetName): void {
     this.quality = cloneQualityConfig(presetName);
     this.adaptiveScale = 1.0;
     this.debugPanel.syncState(this.quality.name, this.quality.toggles);
@@ -547,7 +553,7 @@ class WaterSimulationApp {
       this.quality.toggles.postprocessing ? 1.0 : 0.0;
   }
 
-  private applyFeatureToggle(key: keyof FeatureToggles, value: boolean): void {
+  public applyFeatureToggle(key: keyof FeatureToggles, value: boolean): void {
     this.quality.toggles[key] = value;
     this.waterMaterial.applyQuality(this.quality);
 
@@ -790,6 +796,8 @@ class WaterSimulationApp {
     } else {
       this.controls.update();
     }
+    this.camera.updateMatrixWorld();
+    this.camera.matrixWorldAutoUpdate = false;
 
     this.renderer.info.reset();
     this.perfMonitor.beginGpuFrame();

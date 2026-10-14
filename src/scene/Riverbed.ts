@@ -443,6 +443,7 @@ export class Riverbed {
     envMap: THREE.CubeTexture
   ) {
     this.group = new THREE.Group();
+    this.group.matrixAutoUpdate = false;
 
     this.bedMaterial = new THREE.MeshStandardMaterial({
       color: 0xffffff,
@@ -466,12 +467,18 @@ export class Riverbed {
     this.bedMesh = new THREE.Mesh(bedGeo, this.bedMaterial);
     this.bedMesh.receiveShadow = true;
     this.bedMesh.castShadow = false;
+    this.bedMesh.renderOrder = -1;
+    this.bedMesh.matrixAutoUpdate = false;
+    this.bedMesh.updateMatrix();
     this.group.add(this.bedMesh);
 
     const pebbleGeo = this.buildPebblePrototypeGeometry();
     this.pebbleInstancedMesh = new THREE.InstancedMesh(pebbleGeo, this.pebbleMaterial, 2600);
     this.pebbleInstancedMesh.receiveShadow = true;
     this.pebbleInstancedMesh.castShadow = false;
+    this.pebbleInstancedMesh.renderOrder = -2;
+    this.pebbleInstancedMesh.matrixAutoUpdate = false;
+    this.pebbleInstancedMesh.updateMatrix();
     this.populatePebbles(flowField, pebbleCount);
     this.group.add(this.pebbleInstancedMesh);
   }
