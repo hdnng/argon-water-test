@@ -298,7 +298,7 @@ export class FlowField {
     }> = [
       // --- Foreground & Midground Instream Emergent Rocks ---
       {
-        // Type C: Sedimentary River Stone (right foreground)
+        // Family 2: Warm Brown Sedimentary Stone
         x: 0.65,
         z: 3.15,
         rx: 0.65,
@@ -309,12 +309,12 @@ export class FlowField {
         type: 'emergent',
         style: 'layered-gneiss',
         asym: [1.14, 0.92, 0.85],
-        tint: [0.48, 0.39, 0.29],
-        secTint: [0.26, 0.25, 0.22],
-        moss: 0.32
+        tint: [0.48, 0.38, 0.28],
+        secTint: [0.37, 0.30, 0.23],
+        moss: 0.28
       },
       {
-        // Type A: Water-Worn Granite (left foreground)
+        // Family 4: Smooth Pale River Granodiorite
         x: -0.88,
         z: 2.35,
         rx: 0.55,
@@ -325,12 +325,12 @@ export class FlowField {
         type: 'emergent',
         style: 'rounded-granite',
         asym: [0.91, 1.05, 1.15],
-        tint: [0.50, 0.47, 0.43],
-        secTint: [0.28, 0.29, 0.31],
-        moss: 0.12
+        tint: [0.56, 0.52, 0.46],
+        secTint: [0.42, 0.40, 0.37],
+        moss: 0.08
       },
       {
-        // Type D: Moss-Tinted Wet Boulder (central main boulder)
+        // Family 1: Dark Gray Weathered River Stone
         x: 0.12,
         z: 0.95,
         rx: 0.78,
@@ -341,12 +341,12 @@ export class FlowField {
         type: 'emergent',
         style: 'angular-slate',
         asym: [1.16, 0.88, 0.94],
-        tint: [0.36, 0.38, 0.39],
-        secTint: [0.20, 0.24, 0.22],
-        moss: 0.58
+        tint: [0.33, 0.32, 0.30],
+        secTint: [0.38, 0.37, 0.35],
+        moss: 0.34
       },
       {
-        // Type B: Weathered Dark Stone (left midstream)
+        // Family 5: Dark Wet Mineral Amphibolite
         x: -1.45,
         z: 0.25,
         rx: 0.59,
@@ -357,12 +357,12 @@ export class FlowField {
         type: 'emergent',
         style: 'eroded-basalt',
         asym: [0.88, 1.08, 1.13],
-        tint: [0.22, 0.24, 0.26],
-        secTint: [0.42, 0.33, 0.25],
-        moss: 0.26
+        tint: [0.26, 0.25, 0.24],
+        secTint: [0.32, 0.29, 0.26],
+        moss: 0.18
       },
       {
-        // Type A: Water-Worn Granite (right semi-submerged)
+        // Family 4: Smooth Pale River Quartzite
         x: 1.52,
         z: 1.75,
         rx: 0.48,
@@ -373,12 +373,12 @@ export class FlowField {
         type: 'semi-submerged',
         style: 'rounded-granite',
         asym: [1.09, 0.94, 0.90],
-        tint: [0.48, 0.45, 0.40],
-        secTint: [0.27, 0.28, 0.29],
-        moss: 0.14
+        tint: [0.54, 0.49, 0.43],
+        secTint: [0.40, 0.37, 0.33],
+        moss: 0.06
       },
       {
-        // Type B: Weathered Dark Stone (foreground center-left)
+        // Family 1: Dark Gray Weathered Basalt
         x: -0.32,
         z: 4.35,
         rx: 0.50,
@@ -389,12 +389,12 @@ export class FlowField {
         type: 'emergent',
         style: 'eroded-basalt',
         asym: [0.93, 0.95, 1.16],
-        tint: [0.23, 0.25, 0.27],
-        secTint: [0.41, 0.34, 0.26],
-        moss: 0.24
+        tint: [0.29, 0.28, 0.27],
+        secTint: [0.36, 0.35, 0.33],
+        moss: 0.16
       },
       {
-        // Type C: Sedimentary River Stone (foreground right)
+        // Family 2: Warm Brown Sedimentary Stone
         x: 1.18,
         z: 4.85,
         rx: 0.57,
@@ -405,13 +405,13 @@ export class FlowField {
         type: 'emergent',
         style: 'layered-gneiss',
         asym: [1.15, 0.90, 0.91],
-        tint: [0.46, 0.38, 0.28],
-        secTint: [0.25, 0.25, 0.23],
-        moss: 0.36
+        tint: [0.46, 0.36, 0.26],
+        secTint: [0.35, 0.29, 0.22],
+        moss: 0.32
       },
       // --- Submerged Reef / Riffle Stones ---
       {
-        // Type A: Submerged Water-Worn Granite
+        // Family 4: Smooth Pale Submerged Cobble
         x: -0.22,
         z: 2.85,
         rx: 0.46,
@@ -422,12 +422,12 @@ export class FlowField {
         type: 'submerged',
         style: 'rounded-granite',
         asym: [1.06, 0.88, 0.96],
-        tint: [0.49, 0.44, 0.37],
-        secTint: [0.28, 0.27, 0.25],
-        moss: 0.10
+        tint: [0.52, 0.46, 0.38],
+        secTint: [0.38, 0.34, 0.29],
+        moss: 0.05
       },
       {
-        // Type B: Submerged Weathered Dark Stone
+        // Family 5: Dark Submerged Mineral Rock
         x: 0.88,
         z: -0.35,
         rx: 0.51,
@@ -438,13 +438,13 @@ export class FlowField {
         type: 'submerged',
         style: 'eroded-basalt',
         asym: [0.92, 0.90, 1.12],
-        tint: [0.24, 0.26, 0.28],
-        secTint: [0.39, 0.32, 0.25],
-        moss: 0.16
+        tint: [0.28, 0.27, 0.25],
+        secTint: [0.34, 0.31, 0.27],
+        moss: 0.10
       },
       // --- Cascade / Waterfall Ledge Outcrops (z ~ -2.0) ---
       {
-        // Type D: Moss-Tinted Wet Ledge Outcrop (left ledge)
+        // Family 3: Muted Green Moss-Covered Ledge Outcrop
         x: -2.18,
         z: -1.95,
         rx: 1.20,
@@ -455,12 +455,12 @@ export class FlowField {
         type: 'ledge',
         style: 'angular-slate',
         asym: [1.16, 0.92, 0.88],
-        tint: [0.34, 0.37, 0.36],
-        secTint: [0.19, 0.23, 0.21],
-        moss: 0.76
+        tint: [0.32, 0.33, 0.29],
+        secTint: [0.26, 0.27, 0.24],
+        moss: 0.78
       },
       {
-        // Type C: Sedimentary Mossy Gneiss Outcrop (right ledge)
+        // Family 3: Muted Green Moss-Covered Gneiss Outcrop
         x: 2.08,
         z: -1.85,
         rx: 1.26,
@@ -471,12 +471,12 @@ export class FlowField {
         type: 'ledge',
         style: 'layered-gneiss',
         asym: [0.90, 0.95, 1.14],
-        tint: [0.44, 0.37, 0.29],
-        secTint: [0.24, 0.25, 0.23],
-        moss: 0.68
+        tint: [0.36, 0.35, 0.30],
+        secTint: [0.27, 0.28, 0.24],
+        moss: 0.74
       },
       {
-        // Type D: Moss-Tinted Wet Ledge Divide (center-left)
+        // Family 1: Dark Gray Weathered Ledge Divide
         x: -0.52,
         z: -1.98,
         rx: 0.53,
@@ -487,12 +487,12 @@ export class FlowField {
         type: 'ledge',
         style: 'angular-slate',
         asym: [1.10, 0.96, 0.88],
-        tint: [0.35, 0.37, 0.38],
-        secTint: [0.21, 0.24, 0.23],
-        moss: 0.54
+        tint: [0.31, 0.30, 0.29],
+        secTint: [0.36, 0.35, 0.33],
+        moss: 0.42
       },
       {
-        // Type B: Weathered Dark Ledge Divide (center-right)
+        // Family 2: Warm Brown Weathered Ledge Divide
         x: 0.68,
         z: -1.92,
         rx: 0.47,
@@ -503,13 +503,13 @@ export class FlowField {
         type: 'ledge',
         style: 'eroded-basalt',
         asym: [0.92, 1.04, 1.10],
-        tint: [0.23, 0.25, 0.27],
-        secTint: [0.42, 0.34, 0.26],
-        moss: 0.44
+        tint: [0.44, 0.35, 0.27],
+        secTint: [0.32, 0.27, 0.22],
+        moss: 0.36
       },
       // --- Upstream Boulders (z < -3.0) ---
       {
-        // Type A: Water-Worn Granite
+        // Family 4: Smooth Pale River Stone
         x: 0.25,
         z: -3.85,
         rx: 0.61,
@@ -520,12 +520,12 @@ export class FlowField {
         type: 'emergent',
         style: 'rounded-granite',
         asym: [1.08, 0.92, 0.94],
-        tint: [0.49, 0.45, 0.40],
-        secTint: [0.28, 0.28, 0.29],
-        moss: 0.26
+        tint: [0.53, 0.48, 0.42],
+        secTint: [0.39, 0.36, 0.32],
+        moss: 0.20
       },
       {
-        // Type C: Sedimentary River Stone
+        // Family 2: Warm Sedimentary Gneiss
         x: -1.05,
         z: -5.20,
         rx: 0.69,
@@ -536,12 +536,12 @@ export class FlowField {
         type: 'emergent',
         style: 'layered-gneiss',
         asym: [0.90, 0.96, 1.14],
-        tint: [0.46, 0.37, 0.28],
-        secTint: [0.26, 0.25, 0.23],
-        moss: 0.48
+        tint: [0.45, 0.36, 0.27],
+        secTint: [0.35, 0.29, 0.23],
+        moss: 0.46
       },
       {
-        // Type D: Moss-Tinted Wet Slate
+        // Family 1: Dark Gray Weathered Slate
         x: 1.15,
         z: -6.40,
         rx: 0.55,
@@ -552,13 +552,13 @@ export class FlowField {
         type: 'emergent',
         style: 'angular-slate',
         asym: [1.12, 0.91, 0.90],
-        tint: [0.35, 0.37, 0.38],
-        secTint: [0.21, 0.24, 0.23],
-        moss: 0.42
+        tint: [0.30, 0.29, 0.28],
+        secTint: [0.36, 0.35, 0.34],
+        moss: 0.28
       },
       // --- Shoreline / Bank Anchor Boulders ---
       {
-        // Type C: Large Right-Side Sedimentary / Gneiss Boulder
+        // Family 3: Moss-Covered Bank Anchor Boulder
         x: 2.68,
         z: 3.45,
         rx: 0.98,
@@ -569,12 +569,12 @@ export class FlowField {
         type: 'bank',
         style: 'layered-gneiss',
         asym: [1.14, 0.88, 0.94],
-        tint: [0.46, 0.38, 0.29],
-        secTint: [0.24, 0.24, 0.22],
-        moss: 0.64
+        tint: [0.38, 0.35, 0.29],
+        secTint: [0.28, 0.27, 0.23],
+        moss: 0.76
       },
       {
-        // Type D: Moss-Tinted Left Bank Boulder
+        // Family 3: Moss-Covered Slate Bank Boulder
         x: -2.58,
         z: 1.85,
         rx: 0.90,
@@ -585,9 +585,9 @@ export class FlowField {
         type: 'bank',
         style: 'angular-slate',
         asym: [0.91, 0.94, 1.15],
-        tint: [0.34, 0.36, 0.35],
-        secTint: [0.20, 0.23, 0.21],
-        moss: 0.68
+        tint: [0.29, 0.31, 0.28],
+        secTint: [0.23, 0.25, 0.22],
+        moss: 0.72
       }
     ];
 

@@ -173,60 +173,120 @@ export function createSharedNoiseTexture(size = 512): THREE.DataTexture {
   return tex;
 }
 
-export interface ScenePbrTextureSet {
-  rockAlbedo: THREE.Texture;
-  rockNormal: THREE.Texture;
-  rockArm: THREE.Texture;
-  terrainAlbedo: THREE.Texture;
-  terrainNormal: THREE.Texture;
-  terrainArm: THREE.Texture;
-  dispose: () => void;
-}
-
 /**
- * Loads the local CC0 Poly Haven photogrammetry-scanned PBR texture maps
- * for boulders/cobbles (rock_boulder_dry 1K) and riverbed/riverbank terrain (dirt_aerial_03 1K).
- * Configured with hardware mipmapping, RepeatWrapping, and 4x anisotropic filtering.
+ * Generates a dedicated 512x512 mipmapped PBR Rock & Riverbed Normal + Cavity + Mineral Texture.
+ * Eliminates blocky screen-space dFdx/dFdy clay artifacts by providing crisp prebaked normal slopes,
+ * deep fracture crevices, quartz/feldspar veins, and crystalline mineral speckle:
+ * - R: Precomputed rock tangent normal X component [0..1] (0.5 = neutral)
+ * - G: Precomputed rock tangent normal Y/Z component [0..1] (0.5 = neutral)
+ * - B: Fracture crevice AO & mineral vein mask (< 0.4 = dark crack, > 0.78 = quartz/feldspar vein)
+ * - A: High-frequency mineral crystal speckle (feldspar/mica/iron-oxide grain) & micro-roughness [0..1]
  */
-export function loadScenePbrTextures(maxAnisotropy = 4): ScenePbrTextureSet {
-  const loader = new THREE.TextureLoader();
-  const aniso = Math.min(4, Math.max(1, maxAnisotropy));
+export function createRockDetailTexture(size = 512): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  const rockHeight = new Float32Array(size * size);
 
-  const configureMap = (url: string): THREE.Texture => {
-    const tex = loader.load(url);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    tex.generateMipmaps = true;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.anisotropy = aniso;
-    tex.colorSpace = THREE.NoColorSpace;
-    return tex;
-  };
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const pIdx = y * size + x;
 
-  const rockAlbedo = configureMap('/textures/rock_boulder_diff.jpg');
-  const rockNormal = configureMap('/textures/rock_boulder_nor.jpg');
-  const rockArm = configureMap('/textures/rock_boulder_arm.jpg');
-  const terrainAlbedo = configureMap('/textures/terrain_dirt_diff.jpg');
-  const terrainNormal = configureMap('/textures/terrain_dirt_nor.jpg');
-  const terrainArm = configureMap('/textures/terrain_dirt_arm.jpg');
+      // Subtle domain-warped coordinates for natural rock cleavage without wavy brain-like squiggles
+      const wU = u + (tileableFbm(u, v, 3, 2, 311) - 0.5) * 0.06;
+      const wV = v + (tileableFbm(u, v, 3, 2, 419) - 0.5) * 0.06;
 
-  return {
-    rockAlbedo,
-    rockNormal,
-    rockArm,
-    terrainAlbedo,
-    terrainNormal,
-    terrainArm,
-    dispose: () => {
-      rockAlbedo.dispose();
-      rockNormal.dispose();
-      rockArm.dispose();
-      terrainAlbedo.dispose();
-      terrainNormal.dispose();
-      terrainArm.dispose();
+      // 1. Broad, natural stone facets & cleavage planes
+      const ridges = tileableRidged(wU, wV, 4, 3, 523);
+      // 2. Gentle metamorphic/sedimentary stone structure
+      const strataRaw = tileableFbm(wU * 0.8 + wV * 0.2, wV * 1.2 - wU * 0.2, 6, 3, 617);
+      const terraceSteps = Math.floor(strataRaw * 5.0) / 5.0;
+      const strata = strataRaw * 0.78 + terraceSteps * 0.22;
+
+      // 3. Localized fracture cracks gated by a low-frequency envelope (leaves ~68% of stone face water-worn & clean)
+      const crackGate = Math.max(0.0, Math.min(1.0, (tileableNoise(u, v, 3, 641) - 0.36) / 0.44));
+      const crackNoise1 = Math.abs(tileableNoise(wU, wV, 6, 733) * 2.0 - 1.0);
+      const crackNoise2 = Math.abs(tileableNoise(wU + 0.41, wV + 0.29, 12, 829) * 2.0 - 1.0);
+      const rawCrack =
+        Math.pow(Math.min(1.0, crackNoise1 * 3.4), 0.60) *
+        Math.pow(Math.min(1.0, crackNoise2 * 3.8), 0.65);
+      const deepCrack = 1.0 - (1.0 - rawCrack) * (0.35 + 0.65 * crackGate);
+
+      // 4. Unwarped high-frequency crystalline mineral grain & micro-pores (granite/greywacke/sandstone texture)
+      const grit =
+        tileableNoise(u, v, 24, 919) * 0.38 +
+        tileableNoise(u, v, 48, 1031) * 0.36 +
+        tileableNoise(u, v, 96, 1153) * 0.26;
+
+      const combinedHeight =
+        (ridges * 0.40 + strata * 0.24 + grit * 0.36) * (0.76 + 0.24 * deepCrack);
+      rockHeight[pIdx] = combinedHeight;
+
+      // Channel B: Cavity AO (dark in localized cracks/pits) + subtle mineral quartz veins
+      const veinGate = Math.max(0.0, Math.min(1.0, (tileableNoise(u, v, 4, 1213) - 0.48) / 0.38));
+      const veinSignal =
+        Math.max(
+          0.0,
+          1.0 - Math.abs(tileableNoise(wU * 1.1 - wV * 0.3, wV * 1.1 + wU * 0.3, 5, 1277) * 2.0 - 0.15) * 10.5
+        ) * veinGate;
+      const cavityAndVein = Math.max(
+        0.0,
+        Math.min(1.0, deepCrack * (0.42 + 0.36 * ridges) + veinSignal * 0.34)
+      );
+
+      // Channel A: Crisp crystalline mineral speckle (biotite dark flecks vs feldspar/quartz light grains)
+      const crystal1 = tileableNoise(u, v, 32, 1361);
+      const crystal2 = tileableNoise(u, v, 64, 1483);
+      const crystal3 = tileableNoise(u, v, 128, 1597);
+      const mineralSpeckle = Math.max(
+        0.0,
+        Math.min(1.0, Math.pow(crystal1 * 0.45 + crystal2 * 0.35 + crystal3 * 0.20, 1.15))
+      );
+
+      const idx = pIdx * 4;
+      data[idx + 2] = Math.round(cavityAndVein * 255);
+      data[idx + 3] = Math.round(mineralSpeckle * 255);
     }
-  };
+  }
+
+  // Pass 2: Prebake crisp analytical normal slopes (dH/du, dH/dv) into R and G
+  const normalStrength = size * 0.056;
+  for (let y = 0; y < size; y++) {
+    const yPrev = (y - 1 + size) % size;
+    const yNext = (y + 1) % size;
+    for (let x = 0; x < size; x++) {
+      const xPrev = (x - 1 + size) % size;
+      const xNext = (x + 1) % size;
+
+      const hL = rockHeight[y * size + xPrev];
+      const hR = rockHeight[y * size + xNext];
+      const hD = rockHeight[yPrev * size + x];
+      const hU = rockHeight[yNext * size + x];
+
+      const dHdu = (hR - hL) * 0.5 * normalStrength;
+      const dHdv = (hU - hD) * 0.5 * normalStrength;
+
+      const nx = Math.max(0.0, Math.min(1.0, 0.5 + dHdu * 0.5));
+      const ny = Math.max(0.0, Math.min(1.0, 0.5 + dHdv * 0.5));
+
+      const idx = (y * size + x) * 4;
+      data[idx + 0] = Math.round(nx * 255);
+      data[idx + 1] = Math.round(ny * 255);
+    }
+  }
+
+  const tex = new THREE.DataTexture(
+    data as unknown as BufferSource,
+    size,
+    size,
+    THREE.RGBAFormat,
+    THREE.UnsignedByteType
+  );
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
 }
-
-
