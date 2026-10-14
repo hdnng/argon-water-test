@@ -8,8 +8,7 @@ import {
 } from './utils/QualityPresets';
 import {
   createSharedNoiseTexture,
-  loadScenePbrTextures,
-  ScenePbrTextureSet
+  createRockDetailTexture
 } from './utils/ProceduralTextures';
 import { FlowField, STREAM_DOMAIN } from './water/FlowField';
 import { Environment } from './scene/Environment';
@@ -131,7 +130,7 @@ class WaterSimulationApp {
 
   private quality: QualityConfig;
   private readonly noiseTexture: THREE.DataTexture;
-  private readonly pbrTextures: ScenePbrTextureSet;
+  private readonly rockDetailTexture: THREE.DataTexture;
   private readonly flowField: FlowField;
   private readonly environment: Environment;
   private readonly lighting: Lighting;
@@ -227,9 +226,9 @@ class WaterSimulationApp {
     this.controls.maxDistance = 15.5;
     this.controls.update();
 
-    // 1. Precomputed 512x512 Mipmapped Wave/Foam/Caustics + Real CC0 Poly Haven PBR Textures + Flow Field
+    // 1. Precomputed 512x512 Mipmapped Procedural Wave/Foam/Caustics & PBR Rock Detail Textures + Flow Field
     this.noiseTexture = createSharedNoiseTexture(512);
-    this.pbrTextures = loadScenePbrTextures(this.renderer.capabilities.getMaxAnisotropy());
+    this.rockDetailTexture = createRockDetailTexture(512);
     this.flowField = new FlowField(256);
     if (!hasFloatLinear) {
       this.flowField.flowTexture.magFilter = THREE.NearestFilter;
@@ -249,7 +248,7 @@ class WaterSimulationApp {
     this.scene.add(this.environment.skyMesh);
     this.scene.environment = this.environment.envMap;
 
-    // 3. Shared Underwater Uniforms (Real CC0 Poly Haven PBR Maps + 4-Stage Ablation Control)
+    // 3. Shared Underwater Uniforms
     this.sharedUnderwaterUniforms = {
       uTime: { value: 0 },
       uCausticsEnabled: { value: this.quality.toggles.caustics ? 1.0 : 0.0 },
@@ -257,13 +256,7 @@ class WaterSimulationApp {
       uFlowMap: { value: this.flowField.flowTexture },
       uTerrainMap: { value: this.flowField.terrainTexture },
       uNoiseTex: { value: this.noiseTexture },
-      uRockAlbedoTex: { value: this.pbrTextures.rockAlbedo },
-      uRockNormalTex: { value: this.pbrTextures.rockNormal },
-      uRockArmTex: { value: this.pbrTextures.rockArm },
-      uTerrainAlbedoTex: { value: this.pbrTextures.terrainAlbedo },
-      uTerrainNormalTex: { value: this.pbrTextures.terrainNormal },
-      uTerrainArmTex: { value: this.pbrTextures.terrainArm },
-      uMaterialDebugMode: { value: 0 }
+      uRockDetailTex: { value: this.rockDetailTexture }
     };
 
     // 4. Riverbed, Welded Smooth Pebbles, and Sculpted Boulders
@@ -422,10 +415,15 @@ class WaterSimulationApp {
     this.camera.aspect = width / Math.max(1, height);
     this.camera.updateProjectionMatrix();
 
-    // Match refractionTarget dimensions 1:1 with postTarget so WebGL2 gl.blitFramebuffer
-    // can copy both COLOR_BUFFER_BIT and DEPTH_BUFFER_BIT in a single native DMA pass
-    // (WebGL2 requires identical source & destination dimensions when blitting DEPTH_BUFFER_BIT)
-    this.refractionTarget.setSize(this.activeWidth, this.activeHeight);
+    const refractW = Math.max(
+      64,
+      Math.floor(this.activeWidth * this.quality.refractionResolutionScale)
+    );
+    const refractH = Math.max(
+      64,
+      Math.floor(this.activeHeight * this.quality.refractionResolutionScale)
+    );
+    this.refractionTarget.setSize(refractW, refractH);
     this.postTarget.setSize(this.activeWidth, this.activeHeight);
 
     // Ensure WebGLFramebuffers are instantiated for hardware blitting
@@ -461,8 +459,10 @@ class WaterSimulationApp {
 
     if (!srcFbo || !dstFbo) return false;
 
-    const w = this.postTarget.width;
-    const h = this.postTarget.height;
+    const srcW = this.postTarget.width;
+    const srcH = this.postTarget.height;
+    const dstW = this.refractionTarget.width;
+    const dstH = this.refractionTarget.height;
 
     const state = this.renderer.state as any;
     state.bindFramebuffer(gl.READ_FRAMEBUFFER, srcFbo);
@@ -471,13 +471,25 @@ class WaterSimulationApp {
     gl.blitFramebuffer(
       0,
       0,
-      w,
-      h,
+      srcW,
+      srcH,
       0,
       0,
-      w,
-      h,
-      gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT,
+      dstW,
+      dstH,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR
+    );
+    gl.blitFramebuffer(
+      0,
+      0,
+      srcW,
+      srcH,
+      0,
+      0,
+      dstW,
+      dstH,
+      gl.DEPTH_BUFFER_BIT,
       gl.NEAREST
     );
 
@@ -656,21 +668,6 @@ class WaterSimulationApp {
       const strength = isDragging ? 0.52 : 0.30;
       this.spawnPointerRipple(e.clientX, e.clientY, radius, strength);
     });
-
-    if ((import.meta as any).env?.DEV) {
-      (window as any).__setMaterialDebugMode = (mode: number) => {
-        if (this.sharedUnderwaterUniforms.uMaterialDebugMode) {
-          this.sharedUnderwaterUniforms.uMaterialDebugMode.value = mode;
-        }
-      };
-      window.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.altKey && e.key >= '0' && e.key <= '7') {
-          if (this.sharedUnderwaterUniforms.uMaterialDebugMode) {
-            this.sharedUnderwaterUniforms.uMaterialDebugMode.value = Number(e.key);
-          }
-        }
-      });
-    }
   }
 
   private spawnPointerRipple(
