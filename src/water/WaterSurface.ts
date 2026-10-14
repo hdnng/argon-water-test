@@ -12,6 +12,8 @@ export class WaterSurface {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
+    this.mesh.matrixAutoUpdate = false;
+    this.mesh.updateMatrix();
   }
 
   private buildSurfaceGeometry(segmentsX: number, segmentsZ: number): THREE.BufferGeometry {

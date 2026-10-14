@@ -93,8 +93,10 @@ void main() {
   }
 
   // Compact 5-tap rotated-grid bloom for solar water sparkles only
+  // Reuse already-fetched center texel instead of issuing a duplicate full-screen texture2D read
   vec2 r1 = uTexelSize * 3.0;
-  vec3 bloom = sampleHighlight(vUv) * 0.28;
+  float centerLum = dot(center, vec3(0.2126, 0.7152, 0.0722));
+  vec3 bloom = (center * smoothstep(1.48, 2.85, centerLum)) * 0.28;
   bloom += sampleHighlight(vUv + vec2(r1.x, r1.y)) * 0.18;
   bloom += sampleHighlight(vUv + vec2(-r1.x, r1.y)) * 0.18;
   bloom += sampleHighlight(vUv + vec2(r1.x, -r1.y)) * 0.18;
