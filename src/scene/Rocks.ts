@@ -238,8 +238,8 @@ export class Rocks {
         rz: 0.41,
         rotY: 0.35,
         style: 'angular-slate',
-        tint: [0.27, 0.29, 0.31],
-        secTint: [0.35, 0.36, 0.35],
+        tint: [0.31, 0.30, 0.29],
+        secTint: [0.36, 0.35, 0.34],
         moss: 0.34
       },
       {
@@ -250,8 +250,8 @@ export class Rocks {
         rz: 0.37,
         rotY: -0.22,
         style: 'eroded-basalt',
-        tint: [0.22, 0.24, 0.26],
-        secTint: [0.31, 0.28, 0.25],
+        tint: [0.26, 0.25, 0.24],
+        secTint: [0.32, 0.29, 0.26],
         moss: 0.16
       },
       {
@@ -311,8 +311,8 @@ export class Rocks {
         rz: 0.31,
         rotY: -0.84,
         style: 'eroded-basalt',
-        tint: [0.25, 0.27, 0.29],
-        secTint: [0.33, 0.34, 0.33],
+        tint: [0.29, 0.28, 0.27],
+        secTint: [0.35, 0.34, 0.32],
         moss: 0.14
       },
       {

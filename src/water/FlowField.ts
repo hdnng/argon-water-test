@@ -341,8 +341,8 @@ export class FlowField {
         type: 'emergent',
         style: 'angular-slate',
         asym: [1.16, 0.88, 0.94],
-        tint: [0.28, 0.31, 0.33],
-        secTint: [0.36, 0.37, 0.36],
+        tint: [0.33, 0.32, 0.30],
+        secTint: [0.38, 0.37, 0.35],
         moss: 0.34
       },
       {
@@ -357,8 +357,8 @@ export class FlowField {
         type: 'emergent',
         style: 'eroded-basalt',
         asym: [0.88, 1.08, 1.13],
-        tint: [0.21, 0.23, 0.25],
-        secTint: [0.31, 0.27, 0.24],
+        tint: [0.26, 0.25, 0.24],
+        secTint: [0.32, 0.29, 0.26],
         moss: 0.18
       },
       {
@@ -389,8 +389,8 @@ export class FlowField {
         type: 'emergent',
         style: 'eroded-basalt',
         asym: [0.93, 0.95, 1.16],
-        tint: [0.26, 0.28, 0.30],
-        secTint: [0.34, 0.35, 0.34],
+        tint: [0.29, 0.28, 0.27],
+        secTint: [0.36, 0.35, 0.33],
         moss: 0.16
       },
       {
@@ -438,8 +438,8 @@ export class FlowField {
         type: 'submerged',
         style: 'eroded-basalt',
         asym: [0.92, 0.90, 1.12],
-        tint: [0.24, 0.26, 0.27],
-        secTint: [0.32, 0.29, 0.25],
+        tint: [0.28, 0.27, 0.25],
+        secTint: [0.34, 0.31, 0.27],
         moss: 0.10
       },
       // --- Cascade / Waterfall Ledge Outcrops (z ~ -2.0) ---
@@ -455,8 +455,8 @@ export class FlowField {
         type: 'ledge',
         style: 'angular-slate',
         asym: [1.16, 0.92, 0.88],
-        tint: [0.31, 0.33, 0.29],
-        secTint: [0.25, 0.27, 0.24],
+        tint: [0.32, 0.33, 0.29],
+        secTint: [0.26, 0.27, 0.24],
         moss: 0.78
       },
       {
@@ -487,7 +487,7 @@ export class FlowField {
         type: 'ledge',
         style: 'angular-slate',
         asym: [1.10, 0.96, 0.88],
-        tint: [0.27, 0.29, 0.31],
+        tint: [0.31, 0.30, 0.29],
         secTint: [0.36, 0.35, 0.33],
         moss: 0.42
       },
@@ -552,8 +552,8 @@ export class FlowField {
         type: 'emergent',
         style: 'angular-slate',
         asym: [1.12, 0.91, 0.90],
-        tint: [0.26, 0.28, 0.30],
-        secTint: [0.35, 0.36, 0.35],
+        tint: [0.30, 0.29, 0.28],
+        secTint: [0.36, 0.35, 0.34],
         moss: 0.28
       },
       // --- Shoreline / Bank Anchor Boulders ---
