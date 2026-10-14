@@ -36,7 +36,7 @@ export class Rocks {
       envMap,
       envMapIntensity: 0.58
     });
-    enhanceUnderwaterStoneMaterial(this.rockMaterial, sharedUniforms, true);
+    enhanceUnderwaterStoneMaterial(this.rockMaterial, sharedUniforms, false);
 
     for (let i = 0; i < flowField.rocks.length; i++) {
       const desc = flowField.rocks[i];

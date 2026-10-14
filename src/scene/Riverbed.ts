@@ -75,6 +75,9 @@ export function enhanceUnderwaterStoneMaterial(
       ${isPebbleOrRock ? 'attribute vec4 aRockParams;' : ''}
       varying vec3 vWorldPos;
       varying vec3 vWorldNormal;
+      varying vec3 vViewX;
+      varying vec3 vViewY;
+      varying vec3 vViewZ;
       varying vec2 vDomainUV;
       varying vec4 vRockUv;
       ${isPebbleOrRock ? 'varying vec3 vRockMatParams;' : ''}
@@ -95,6 +98,9 @@ export function enhanceUnderwaterStoneMaterial(
         normMat = mat3(modelMatrix * instanceMatrix);
       #endif
       vWorldNormal = normalize(normMat * objectNormal);
+      vViewX = (viewMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz;
+      vViewY = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+      vViewZ = (viewMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz;
       vDomainUV = vec2(
         (wp.x - (${STREAM_DOMAIN.minX.toFixed(1)})) / (${STREAM_DOMAIN.width.toFixed(1)}),
         (wp.z - (${STREAM_DOMAIN.minZ.toFixed(1)})) / (${STREAM_DOMAIN.length.toFixed(1)})
@@ -141,6 +147,9 @@ export function enhanceUnderwaterStoneMaterial(
       #include <common>
       varying vec3 vWorldPos;
       varying vec3 vWorldNormal;
+      varying vec3 vViewX;
+      varying vec3 vViewY;
+      varying vec3 vViewZ;
       varying vec2 vDomainUV;
       varying vec4 vRockUv;
       ${isPebbleOrRock ? 'varying vec3 vRockMatParams;' : ''}
@@ -192,24 +201,23 @@ export function enhanceUnderwaterStoneMaterial(
       vec2 uvSide = vRockUv.zw;
 
       vec4 rockMacroTop = texture2D(uRockDetailTex, uvTop);
+      vec4 rockMacroSide = texture2D(uRockDetailTex, uvSide);
+      vec4 rockMacro = mix(rockMacroSide, rockMacroTop, topBlend);
+      vec2 uvMicro = mix(uvSide, uvTop, topBlend) * 2.85;
+      vec4 rockMicro = texture2D(uRockDetailTex, uvMicro);
+
       ${
         isPebbleOrRock
           ? /* glsl */ `
-          vec4 rockMacroSide = texture2D(uRockDetailTex, uvSide);
-          vec4 rockMacro = mix(rockMacroSide, rockMacroTop, topBlend);
-          vec2 uvMicro = mix(uvSide, uvTop, topBlend) * 2.85;
           float crackDensity = vRockMatParams.x;
           float baseRoughParam = vRockMatParams.y;
           float mossCoverageParam = vRockMatParams.z;
           `
           : /* glsl */ `
-          vec4 rockMacro = rockMacroTop;
-          vec2 uvMicro = uvTop * 2.85;
           float crackDensity = 0.35;
           float baseRoughParam = 0.80;
           `
       }
-      vec4 rockMicro = texture2D(uRockDetailTex, uvMicro);
 
       // Sparse localized crevices: rockMacro.b is ~0.52 on smooth stone faces and < 0.38 only in localized joints
       float rawCrack = smoothstep(0.40, 0.14, rockMacro.b) * crackDensity;
@@ -396,23 +404,16 @@ export function enhanceUnderwaterStoneMaterial(
       float microWeight = 0.38 * distAtten;
       vec2 microSlope = (rockMicro.rg * 2.0 - 1.0) * microWeight;
       vec2 slopeTop = (rockMacroTop.rg * 2.0 - 1.0) * 0.72 + microSlope;
+      vec2 slopeSide = (rockMacroSide.rg * 2.0 - 1.0) * 0.76 + microSlope;
+
       vec3 worldPerturbTop = vec3(-slopeTop.x, 0.0, -slopeTop.y);
-      ${
-        isPebbleOrRock
-          ? /* glsl */ `
-          vec2 slopeSide = (rockMacroSide.rg * 2.0 - 1.0) * 0.76 + microSlope;
-          vec3 worldPerturbSide = vec3(-slopeSide.x * Wn.z, -slopeSide.y, slopeSide.x * Wn.x);
-          vec3 worldPerturb = mix(worldPerturbSide, worldPerturbTop, topBlend);
-          `
-          : /* glsl */ `
-          vec3 worldPerturb = worldPerturbTop;
-          `
-      }
+      vec3 worldPerturbSide = vec3(-slopeSide.x * Wn.z, -slopeSide.y, slopeSide.x * Wn.x);
+      vec3 worldPerturb = mix(worldPerturbSide, worldPerturbTop, topBlend);
 
       // Project perturbation orthogonal to world normal
       worldPerturb -= Wn * dot(worldPerturb, Wn);
 
-      vec3 viewPerturb = mat3(viewMatrix) * worldPerturb;
+      vec3 viewPerturb = vViewX * worldPerturb.x + vViewY * worldPerturb.y + vViewZ * worldPerturb.z;
       float perRockBump = ${isPebbleOrRock ? '(0.34 + 0.36 * crackDensity)' : '0.42'} * (0.55 + 0.45 * distAtten);
       normal = normalize(normal + viewPerturb * perRockBump);
       `

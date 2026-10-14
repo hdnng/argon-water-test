@@ -355,9 +355,8 @@ class WaterSimulationApp {
 
     (window as any).__waterApp = this;
 
-    // Precompute static scene-graph world matrices once so dual-pass rendering does not re-traverse matrices twice per frame
+    // Precompute static scene-graph world matrices once
     this.scene.updateMatrixWorld(true);
-    this.scene.matrixWorldAutoUpdate = false;
     this.postScene.updateMatrixWorld(true);
     this.postScene.matrixWorldAutoUpdate = false;
 
@@ -639,6 +638,7 @@ class WaterSimulationApp {
       );
     }
     this.controls.update();
+    this.camera.updateMatrixWorld();
   }
 
   private updateAdaptiveResolution(now: number): void {
@@ -798,8 +798,6 @@ class WaterSimulationApp {
     } else {
       this.controls.update();
     }
-    this.camera.updateMatrixWorld();
-    this.camera.matrixWorldAutoUpdate = false;
 
     this.renderer.info.reset();
     this.perfMonitor.beginGpuFrame();
